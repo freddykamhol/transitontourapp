@@ -1,6 +1,7 @@
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { config } from "./config.js";
 import { migrate } from "./db.js";
@@ -310,7 +311,8 @@ app.post("/public/tickets/:token/reply", (req, res) => {
 });
 
 // Frontend (SPA) aus dist/ ausliefern (Production)
-const distDir = path.resolve(process.cwd(), "dist");
+const here = path.dirname(fileURLToPath(import.meta.url));
+const distDir = path.resolve(here, "..", "dist");
 const distIndex = path.join(distDir, "index.html");
 if (fs.existsSync(distIndex)) {
   app.use(express.static(distDir));
