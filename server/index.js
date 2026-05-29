@@ -314,8 +314,7 @@ const distDir = path.resolve(process.cwd(), "dist");
 const distIndex = path.join(distDir, "index.html");
 if (fs.existsSync(distIndex)) {
   app.use(express.static(distDir));
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api/") || req.path === "/api" || req.path.startsWith("/public/") || req.path === "/public") return next();
+  app.get(/^\/(?!api(?:\/|$)|public(?:\/|$)).*/, (req, res) => {
     return res.sendFile(distIndex);
   });
 }
