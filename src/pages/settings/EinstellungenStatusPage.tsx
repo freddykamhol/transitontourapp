@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { portalApiBaseUrl, portalCalendarToken } from "../../api/portalApi";
 
 type CheckResult = {
@@ -9,6 +9,19 @@ type CheckResult = {
   checkedAt: string;
 };
 
+function StatusPill(props: { ok: boolean; text: string }) {
+  return (
+    <span
+      className={[
+        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
+        props.ok ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200" : "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
+      ].join(" ")}
+    >
+      {props.text}
+    </span>
+  );
+}
+
 export default function EinstellungenStatusPage() {
   const apiBase = useMemo(() => portalApiBaseUrl(), []);
   const calendarUrl = useMemo(() => `${apiBase}/public/calendar.ics?token=${encodeURIComponent(portalCalendarToken())}`, [apiBase]);
@@ -16,7 +29,7 @@ export default function EinstellungenStatusPage() {
   const [apiHealth, setApiHealth] = useState<CheckResult | null>(null);
   const [calendarHealth, setCalendarHealth] = useState<CheckResult | null>(null);
 
-  async function runChecks() {
+  const runChecks = useCallback(async () => {
     const now = new Date().toLocaleString();
 
     try {
@@ -49,25 +62,12 @@ export default function EinstellungenStatusPage() {
     } catch (e) {
       setCalendarHealth({ ok: false, label: "WebCAL Feed", detail: e instanceof Error ? e.message : "Fehler", checkedAt: now });
     }
-  }
+  }, [apiBase, calendarUrl]);
 
   useEffect(() => {
-    void runChecks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function StatusPill(props: { ok: boolean; text: string }) {
-    return (
-      <span
-        className={[
-          "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
-          props.ok ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200" : "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
-        ].join(" ")}
-      >
-        {props.text}
-      </span>
-    );
-  }
+    const id = window.setTimeout(() => void runChecks(), 0);
+    return () => window.clearTimeout(id);
+  }, [runChecks]);
 
   return (
     <div className="grid gap-6">

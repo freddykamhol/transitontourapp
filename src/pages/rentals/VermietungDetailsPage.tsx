@@ -107,6 +107,33 @@ export default function VermietungDetailsPage() {
   const meta = useMemo(() => (rental ? getRentalStatus(rental, new Date()) : null), [rental]);
   const running = rental ? isRunning(rental) : false;
 
+  const docDefs = useMemo(() => {
+    if (!rental) return [];
+    return [
+      {
+        id: "vertrag" as const,
+        title: "Vertrag",
+        filename: `mietvertrag-${rental.id}.pdf`,
+        build: () => buildRentalContractPdf(rental),
+        download: () => downloadRentalContractPdf(rental),
+      },
+      {
+        id: "schaden" as const,
+        title: "Schadensliste",
+        filename: `schadensliste-${rental.id}.pdf`,
+        build: () => buildDamageListPdf(rental),
+        download: () => downloadDamageListPdf(rental),
+      },
+      {
+        id: "rechnung" as const,
+        title: "Rechnung",
+        filename: `rechnung-${rental.id}.pdf`,
+        build: () => buildInvoicePdf(rental),
+        download: () => downloadInvoicePdf(rental),
+      },
+    ] as const;
+  }, [rental]);
+
   if (!rental) {
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -122,34 +149,6 @@ export default function VermietungDetailsPage() {
   }
 
   const statusText = meta?.overdue ? "Überfällig" : statusLabel(meta?.status ?? "laufend");
-
-  const docDefs = useMemo(
-    () =>
-      [
-        {
-          id: "vertrag" as const,
-          title: "Vertrag",
-          filename: `mietvertrag-${rental.id}.pdf`,
-          build: () => buildRentalContractPdf(rental),
-          download: () => downloadRentalContractPdf(rental),
-        },
-        {
-          id: "schaden" as const,
-          title: "Schadensliste",
-          filename: `schadensliste-${rental.id}.pdf`,
-          build: () => buildDamageListPdf(rental),
-          download: () => downloadDamageListPdf(rental),
-        },
-        {
-          id: "rechnung" as const,
-          title: "Rechnung",
-          filename: `rechnung-${rental.id}.pdf`,
-          build: () => buildInvoicePdf(rental),
-          download: () => downloadInvoicePdf(rental),
-        },
-      ] as const,
-    [rental],
-  );
 
   return (
     <div className="grid gap-6">

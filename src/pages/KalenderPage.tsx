@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { portalApiBaseUrl, portalCalendarToken, syncCalendar } from "../api/portalApi";
 import type { CalendarSyncItem } from "../domain/calendar";
@@ -62,14 +62,16 @@ export default function KalenderPage() {
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncError, setSyncError] = useState<string>("");
 
-  useEffect(() => {
+  const urlSelectedDate = useMemo(() => {
     const qDate = searchParams.get("date");
-    if (!qDate) return;
+    if (!qDate) return null;
     const d = new Date(`${qDate}T00:00:00`);
-    if (!Number.isFinite(d.getTime())) return;
-    setMonth(startOfMonth(d));
-    setSelected(d);
+    if (!Number.isFinite(d.getTime())) return null;
+    return d;
   }, [searchParams]);
+
+  const effectiveSelected = urlSelectedDate ?? selected;
+  const effectiveMonth = urlSelectedDate ? startOfMonth(urlSelectedDate) : month;
 
   const vehicleLabelById = useMemo(() => {
     const map = new Map<string, string>();
@@ -212,7 +214,7 @@ export default function KalenderPage() {
   }, [syncItems]);
 
   const gridDays = useMemo(() => {
-    const first = startOfMonth(month);
+    const first = startOfMonth(effectiveMonth);
     const firstWeekday = mondayIndex(first.getDay());
     const start = new Date(first);
     start.setDate(first.getDate() - firstWeekday);
@@ -224,9 +226,9 @@ export default function KalenderPage() {
       days.push(d);
     }
     return days;
-  }, [month]);
+  }, [effectiveMonth]);
 
-  const selectedKey = toIsoDate(selected);
+  const selectedKey = toIsoDate(effectiveSelected);
   const selectedHandovers = useMemo(() => {
     return rentals
       .filter((r) => (vehicleFilter ? r.vehicle?.vehicleId === vehicleFilter : true))
@@ -306,17 +308,27 @@ export default function KalenderPage() {
             <button
               type="button"
               className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 active:translate-y-px"
-              onClick={() => setMonth((m) => addMonths(m, -1))}
+              onClick={() => {
+                setMonth((m) => addMonths(m, -1));
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.delete("date");
+                setSearchParams(nextParams, { replace: true });
+              }}
             >
               ‹
             </button>
             <div className="min-w-40 text-center text-sm font-semibold tracking-tight text-slate-900">
-              {month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+              {effectiveMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
             </div>
             <button
               type="button"
               className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 active:translate-y-px"
-              onClick={() => setMonth((m) => addMonths(m, 1))}
+              onClick={() => {
+                setMonth((m) => addMonths(m, 1));
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.delete("date");
+                setSearchParams(nextParams, { replace: true });
+              }}
             >
               ›
             </button>
@@ -327,6 +339,9 @@ export default function KalenderPage() {
                 const now = new Date();
                 setMonth(startOfMonth(now));
                 setSelected(now);
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.delete("date");
+                setSearchParams(nextParams, { replace: true });
               }}
             >
               Heute
@@ -417,7 +432,7 @@ export default function KalenderPage() {
             </div>
             <div className="grid grid-cols-7 bg-white">
               {gridDays.map((d) => {
-                const inMonth = d.getMonth() === month.getMonth();
+                const inMonth = d.getMonth() === effectiveMonth.getMonth();
                 const isToday = sameDay(d, today);
                 const isSelected = sameDay(d, selected);
                 const key = toIsoDate(d);
@@ -443,7 +458,12 @@ export default function KalenderPage() {
                       !inMonth ? "bg-slate-50/40" : "bg-white",
                       isSelected ? "bg-slate-50 ring-2 ring-inset ring-slate-900" : "",
                     ].join(" ")}
-                    onClick={() => setSelected(d)}
+                    onClick={() => {
+                      setSelected(d);
+                      const nextParams = new URLSearchParams(searchParams);
+                      nextParams.delete("date");
+                      setSearchParams(nextParams, { replace: true });
+                    }}
                     title={
                       totalActiveVehicles > 0 && rentedCount > 0
                         ? `${rentedCount} / ${totalActiveVehicles} Fahrzeuge vermietet`
@@ -507,7 +527,7 @@ export default function KalenderPage() {
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Auswahl</div>
                 <div className="mt-1 text-sm font-semibold text-slate-900">
-                  {selected.toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+                  {effectiveSelected.toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
                 </div>
               </div>
               <div className="text-xs font-semibold text-slate-500">{selectedEntryCount} Einträge</div>
