@@ -1,4 +1,6 @@
 import express from "express";
+import fs from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 import { config } from "./config.js";
 import { migrate } from "./db.js";
@@ -306,6 +308,17 @@ app.post("/public/tickets/:token/reply", (req, res) => {
   setStatus(result.request.id, "neu");
   return res.status(201).json({ ok: true });
 });
+
+// Frontend (SPA) aus dist/ ausliefern (Production)
+const distDir = path.resolve(process.cwd(), "dist");
+const distIndex = path.join(distDir, "index.html");
+if (fs.existsSync(distIndex)) {
+  app.use(express.static(distDir));
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api/") || req.path === "/api" || req.path.startsWith("/public/") || req.path === "/public") return next();
+    return res.sendFile(distIndex);
+  });
+}
 
 app.use((err, _req, res, _next) => {
   if (String(err?.message || "").includes("CORS")) return res.status(403).json({ error: "cors_not_allowed" });
