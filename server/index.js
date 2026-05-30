@@ -314,6 +314,28 @@ app.post("/public/tickets/:token/reply", (req, res) => {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(here, "..", "dist");
 const distIndex = path.join(distDir, "index.html");
+
+// Debug helper (protected): hilft bei Whitescreen/Deployments
+app.get("/api/debug/static", requireApiKey, (_req, res) => {
+  let indexHead = null;
+  try {
+    if (fs.existsSync(distIndex)) {
+      indexHead = fs.readFileSync(distIndex, "utf8").slice(0, 600);
+    }
+  } catch {
+    indexHead = null;
+  }
+  return res.json({
+    cwd: process.cwd(),
+    serverDir: here,
+    distDir,
+    distIndex,
+    distIndexExists: fs.existsSync(distIndex),
+    distFiles: fs.existsSync(distDir) ? fs.readdirSync(distDir).slice(0, 50) : [],
+    indexHead,
+  });
+});
+
 if (fs.existsSync(distIndex)) {
   app.use(express.static(distDir));
   app.get(/^\/(?!api(?:\/|$)|public(?:\/|$)).*/, (req, res) => {
