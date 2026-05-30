@@ -336,8 +336,42 @@ app.get("/api/debug/static", requireApiKey, (_req, res) => {
   });
 });
 
+// Debug helper (token via query, falls Header nicht gesetzt werden kann)
+app.get("/public/debug/static", (req, res) => {
+  const token = String(req.query.token ?? "");
+  const expected = config.calendarToken && config.calendarToken.trim().length > 0 ? config.calendarToken : config.apiKey;
+  if (!token || token !== expected) return res.status(401).json({ error: "unauthorized" });
+
+  let indexHead = null;
+  try {
+    if (fs.existsSync(distIndex)) {
+      indexHead = fs.readFileSync(distIndex, "utf8").slice(0, 600);
+    }
+  } catch {
+    indexHead = null;
+  }
+  return res.json({
+    cwd: process.cwd(),
+    serverDir: here,
+    distDir,
+    distIndex,
+    distIndexExists: fs.existsSync(distIndex),
+    distFiles: fs.existsSync(distDir) ? fs.readdirSync(distDir).slice(0, 50) : [],
+    indexHead,
+  });
+});
+
 if (fs.existsSync(distIndex)) {
-  app.use(express.static(distDir));
+  app.use(
+    express.static(distDir, {
+      setHeaders(res, filePath) {
+        // Some hosts/proxies mis-detect MIME types for module scripts. Force correct types for common assets.
+        if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) res.setHeader("content-type", "application/javascript; charset=utf-8");
+        if (filePath.endsWith(".css")) res.setHeader("content-type", "text/css; charset=utf-8");
+        if (filePath.endsWith(".svg")) res.setHeader("content-type", "image/svg+xml");
+      },
+    }),
+  );
   app.get(/^\/(?!api(?:\/|$)|public(?:\/|$)).*/, (req, res) => {
     return res.sendFile(distIndex);
   });
