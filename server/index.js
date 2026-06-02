@@ -382,6 +382,11 @@ app.use((err, _req, res, _next) => {
   return res.status(500).json({ error: "server_error" });
 });
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`[portal-api] listening on http://localhost:${config.port}`);
+});
+
+server.on("error", (err) => {
+  console.error("[portal-api] failed to start", err);
+  process.exit(1);
 });

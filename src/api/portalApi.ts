@@ -46,7 +46,9 @@ export type GetRequestResponse = {
 
 export function portalApiBaseUrl(): string {
   const raw = (import.meta.env.VITE_PORTAL_API_URL as string | undefined)?.trim();
-  return raw && raw.length > 0 ? raw.replace(/\/+$/, "") : "http://localhost:8787";
+  if (raw && raw.length > 0) return raw.replace(/\/+$/, "");
+  if (import.meta.env.PROD) return "";
+  return "http://localhost:8787";
 }
 
 function apiKey(): string {
