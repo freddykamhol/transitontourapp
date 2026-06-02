@@ -365,6 +365,7 @@ if (fs.existsSync(distIndex)) {
   app.use(
     express.static(distDir, {
       setHeaders(res, filePath) {
+        if (filePath.endsWith("index.html")) res.setHeader("cache-control", "no-store");
         // Some hosts/proxies mis-detect MIME types for module scripts. Force correct types for common assets.
         if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) res.setHeader("content-type", "application/javascript; charset=utf-8");
         if (filePath.endsWith(".css")) res.setHeader("content-type", "text/css; charset=utf-8");
@@ -373,6 +374,7 @@ if (fs.existsSync(distIndex)) {
     }),
   );
   app.get(/^\/(?!api(?:\/|$)|public(?:\/|$)).*/, (req, res) => {
+    res.setHeader("cache-control", "no-store");
     return res.sendFile(distIndex);
   });
 }
