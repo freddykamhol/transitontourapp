@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import type { Rental, RentalAddon, RentalDigitalSignature, RentalParty } from "../../domain/rental";
 import { getCompanyData } from "../../storage/companyRepo";
 import { getVehicle } from "../../storage/vehicleRepo";
+import { renderSketchWithMarkers } from "../vehicles/exportDamageSketch";
 import { damageTypeLabel, positionLabel } from "../vehicles/vehiclesUi";
 import { formatEur } from "./rentalUi";
 
@@ -157,13 +158,13 @@ export function buildRentalContractPdf(rental: Rental): jsPDF {
 
   function tableHeader(labels: string[], widths: number[], x: number, y: number) {
     let cx = x;
-    doc.setFillColor(...navy);
-    doc.setDrawColor(...navy);
     labels.forEach((label, index) => {
+      doc.setFillColor(226, 232, 240);
+      doc.setDrawColor(...border);
       doc.rect(cx, y, widths[index], 8, "FD");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(6.4);
-      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(6.9);
+      setText(navy);
       doc.text(label, cx + 2, y + 5.2);
       cx += widths[index];
     });
@@ -572,7 +573,7 @@ export function downloadInvoicePdf(rental: Rental): void {
   doc.save(`rechnung-${rental.id}.pdf`);
 }
 
-export function buildDamageListPdf(rental: Rental): jsPDF {
+export async function buildDamageListPdf(rental: Rental): Promise<jsPDF> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
@@ -586,9 +587,50 @@ export function buildDamageListPdf(rental: Rental): jsPDF {
   const vehicleId = rental.vehicle.vehicleId;
   const vehicle = vehicleId ? getVehicle(vehicleId) : null;
   const damages = vehicle?.damages ?? [];
+  const markers = damages
+    .map((damage) => damage.marker)
+    .filter((marker): marker is { x: number; y: number } => {
+      return Boolean(
+        marker &&
+          typeof marker === "object" &&
+          typeof marker.x === "number" &&
+          typeof marker.y === "number" &&
+          Number.isFinite(marker.x) &&
+          Number.isFinite(marker.y),
+      );
+    })
+    .map((marker) => ({
+      x: Math.max(0, Math.min(1, marker.x)),
+      y: Math.max(0, Math.min(1, marker.y)),
+    }));
 
   let y = 48;
   doc.setFont("helvetica", "bold");
+  doc.text("Skizze", 15, y);
+  y += 6;
+
+  try {
+    const rendered = await renderSketchWithMarkers({ imageSrc: "/sketch/vehicle-top.png", markers, width: 1200 });
+    const sketchW = 180;
+    const sketchH = Math.min(92, (rendered.height / rendered.width) * sketchW);
+    doc.addImage(rendered.dataUrl, "PNG", 15, y, sketchW, sketchH);
+    y += sketchH + 12;
+  } catch {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Skizzenbild konnte nicht geladen werden.", 15, y);
+    y += 12;
+  }
+
+  if (y > 235) {
+    doc.addPage();
+    y = 20;
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
   doc.text("Schäden", 15, y);
   y += 8;
 
@@ -631,7 +673,7 @@ export function buildDamageListPdf(rental: Rental): jsPDF {
   return doc;
 }
 
-export function downloadDamageListPdf(rental: Rental): void {
-  const doc = buildDamageListPdf(rental);
+export async function downloadDamageListPdf(rental: Rental): Promise<void> {
+  const doc = await buildDamageListPdf(rental);
   doc.save(`schadensliste-${rental.id}.pdf`);
 }

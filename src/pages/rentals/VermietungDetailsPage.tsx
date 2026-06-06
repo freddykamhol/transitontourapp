@@ -573,13 +573,13 @@ export default function VermietungDetailsPage() {
       >
         <form
           className="grid gap-3"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             if (!protectedOpen) return;
             const def = docDefs.find((x) => x.id === protectedOpen.doc);
             if (!def) return;
             if (!protectedPassword.trim()) return;
-            def.download();
+            await def.download();
             setProtectedOpen(null);
             setProtectedPassword("");
           }}
@@ -642,7 +642,7 @@ export default function VermietungDetailsPage() {
             setSendBusy(true);
             setSendError("");
             try {
-              const pdf = def.build();
+              const pdf = await def.build();
               const buf = pdf.output("arraybuffer") as ArrayBuffer;
               const contentBase64 = await arrayBufferToBase64(buf);
               await sendMail({

@@ -42,7 +42,7 @@ export async function sendRentalDocumentsMail(rental: Rental): Promise<{ message
   await prepareRentalSignaturePackage(rental);
 
   const contract = buildRentalContractPdf(rental);
-  const damageList = buildDamageListPdf(rental);
+  const damageList = await buildDamageListPdf(rental);
   const [contractBase64, damageListBase64] = await Promise.all([
     arrayBufferToBase64(contract.output("arraybuffer") as ArrayBuffer),
     arrayBufferToBase64(damageList.output("arraybuffer") as ArrayBuffer),
