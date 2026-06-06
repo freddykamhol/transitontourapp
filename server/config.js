@@ -14,15 +14,26 @@ function optional(name, fallback) {
 
 const defaultAllowedOrigins = [
   "https://transitontour.de",
+  "https://www.transitontour.de",
   "https://reisetransit.de",
+  "https://www.reisetransit.de",
   "https://campingfreunde.com",
+  "https://www.campingfreunde.com",
   "https://auszeitvan.online",
+  "https://www.auszeitvan.online",
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:4173",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:4173",
+];
+
+const defaultAllowedRootDomains = [
+  "transitontour.de",
+  "reisetransit.de",
+  "campingfreunde.com",
+  "auszeitvan.online",
 ];
 
 export const config = {
@@ -35,4 +46,9 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean)
     .concat(defaultAllowedOrigins),
+  allowedRootDomains: optional("PORTAL_ALLOWED_ROOT_DOMAINS", "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .concat(defaultAllowedRootDomains),
 };

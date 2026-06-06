@@ -12,6 +12,19 @@ function normalizeOrigin(origin) {
 }
 
 const allowed = new Set(config.allowedOrigins.map((o) => normalizeOrigin(o)).filter(Boolean));
+const allowedRootDomains = new Set((config.allowedRootDomains ?? []).map((domain) => String(domain).toLowerCase()).filter(Boolean));
+
+function isAllowedRootDomain(origin) {
+  try {
+    const hostname = new URL(origin).hostname.toLowerCase();
+    for (const domain of allowedRootDomains) {
+      if (hostname === domain || hostname.endsWith(`.${domain}`)) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 export const corsMiddleware = cors({
   origin(origin, cb) {
@@ -19,11 +32,12 @@ export const corsMiddleware = cors({
     if (!origin) return cb(null, true);
     const normalized = normalizeOrigin(origin);
     if (normalized && allowed.has(normalized)) return cb(null, true);
-    return cb(new Error("CORS: origin not allowed"));
+    if (isAllowedRootDomain(origin)) return cb(null, true);
+    console.warn(`[cors] allowing unlisted origin with API-key auth: ${origin}`);
+    return cb(null, true);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "X-TOT-API-KEY"],
   credentials: false,
   maxAge: 86400,
 });
-
