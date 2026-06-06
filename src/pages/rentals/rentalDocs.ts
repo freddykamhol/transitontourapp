@@ -157,17 +157,25 @@ export function buildRentalContractPdf(rental: Rental): jsPDF {
   }
 
   function tableHeader(labels: string[], widths: number[], x: number, y: number) {
+    const totalWidth = widths.reduce((sum, width) => sum + width, 0);
+    doc.setFillColor(...navy);
+    doc.setDrawColor(...navy);
+    doc.rect(x, y, totalWidth, 8, "F");
+
     let cx = x;
     labels.forEach((label, index) => {
-      doc.setFillColor(226, 232, 240);
-      doc.setDrawColor(...border);
-      doc.rect(cx, y, widths[index], 8, "FD");
+      doc.setDrawColor(255, 255, 255);
+      if (index > 0) doc.line(cx, y, cx, y + 8);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(6.9);
-      setText(navy);
+      doc.setFontSize(6.8);
+      doc.setTextColor(255, 255, 255);
       doc.text(label, cx + 2, y + 5.2);
       cx += widths[index];
     });
+
+    doc.setDrawColor(...navy);
+    doc.rect(x, y, totalWidth, 8, "S");
+    setText();
   }
 
   function tableRow(values: string[], widths: number[], x: number, y: number, h: number) {
