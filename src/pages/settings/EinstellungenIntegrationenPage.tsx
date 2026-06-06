@@ -101,12 +101,18 @@ export default function EinstellungenIntegrationenPage() {
             <span className="text-xs font-semibold text-slate-600">Passwort</span>
             <input
               type="password"
+              autoComplete="new-password"
+              spellCheck={false}
               value={smtp.password}
               onChange={(e) => setSmtp((s) => ({ ...s, password: e.target.value }))}
               className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
               placeholder={smtp.hasPassword ? "gespeichert - leer lassen zum Beibehalten" : "••••••••"}
             />
-            {smtp.hasPassword ? <span className="text-xs text-slate-500">Ein Passwort ist gespeichert. Ein neues Passwort ersetzt es.</span> : null}
+            {smtp.hasPassword ? (
+              <span className="text-xs text-slate-500">
+                Ein Passwort ist gespeichert. Nur ein echtes Mailbox-/App-Passwort ersetzt es.
+              </span>
+            ) : null}
           </label>
           <label className="grid gap-1 md:col-span-2">
             <span className="text-xs font-semibold text-slate-600">Absender (From)</span>
@@ -141,7 +147,7 @@ export default function EinstellungenIntegrationenPage() {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs font-semibold text-slate-500">
-            {savedAt ? `Gespeichert: ${savedAt}` : status || "Noch nicht gespeichert"}
+            {status || (savedAt ? `Gespeichert: ${savedAt}` : "Noch nicht gespeichert")}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
