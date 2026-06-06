@@ -10,7 +10,9 @@ import { requireApiKey } from "./auth.js";
 import { inboundRequestSchema, messageSchema } from "./validation.js";
 import { listCalendarItems, replaceCalendarItems } from "./calendarRepo.js";
 import { buildIcs } from "./ics.js";
-import { sendMail, smtpConfigured } from "./mailer.js";
+import { describeMailError, sendMail, smtpConfigured, verifySmtp } from "./mailer.js";
+import { getSmtpSettings, saveSmtpSettings } from "./settingsRepo.js";
+import { getRentalSignaturePackage, saveRentalSignaturePackage, saveSignedContract } from "./signatureRepo.js";
 import {
   addMessage,
   blockIp,
@@ -30,7 +32,7 @@ migrate();
 const app = express();
 app.disable("x-powered-by");
 app.use(corsMiddleware);
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "12mb" }));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
@@ -202,6 +204,120 @@ app.post("/api/calendar/sync", requireApiKey, (req, res) => {
   return res.json({ ok: true });
 });
 
+// Einstellungen: SMTP
+app.get("/api/settings/smtp", requireApiKey, (_req, res) => {
+  const smtp = getSmtpSettings() ?? {};
+  return res.json({
+    host: smtp.host ?? "",
+    port: String(smtp.port ?? "587"),
+    user: smtp.user ?? "",
+    fromEmail: smtp.fromEmail ?? "",
+    secure: Boolean(smtp.secure),
+    hasPassword: Boolean(smtp.password),
+  });
+});
+
+app.put("/api/settings/smtp", requireApiKey, (req, res) => {
+  const parsed = z
+    .object({
+      host: z.string().trim().min(1),
+      port: z.coerce.number().int().min(1).max(65535).default(587),
+      user: z.string().trim().optional().default(""),
+      password: z.string().optional(),
+      fromEmail: z.string().trim().email(),
+      secure: z.boolean().optional().default(false),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+
+  const existing = getSmtpSettings() ?? {};
+  saveSmtpSettings({
+    host: parsed.data.host,
+    port: String(parsed.data.port),
+    user: parsed.data.user,
+    password: parsed.data.password && parsed.data.password.length > 0 ? parsed.data.password : existing.password ?? "",
+    fromEmail: parsed.data.fromEmail,
+    secure: parsed.data.secure,
+  });
+
+  return res.json({ ok: true });
+});
+
+app.post("/api/settings/smtp/test", requireApiKey, async (req, res) => {
+  if (!smtpConfigured()) return res.status(400).json({ error: "smtp_not_configured" });
+  const parsed = z.object({ toEmail: z.string().trim().email().optional() }).safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+
+  const smtp = getSmtpSettings() ?? {};
+  const toEmail = parsed.data.toEmail ?? smtp.fromEmail;
+  if (!toEmail) return res.status(400).json({ error: "smtp_to_missing" });
+
+  try {
+    const result = await sendMail({
+      to: [toEmail],
+      subject: "Transit on Tour SMTP-Test",
+      text: "SMTP ist eingerichtet. Diese Testmail wurde aus den Einstellungen versendet.",
+    });
+    return res.status(201).json({ ok: true, messageId: result.messageId });
+  } catch (e) {
+    return res.status(500).json({ error: "smtp_test_failed", message: describeMailError(e) });
+  }
+});
+
+app.post("/api/settings/smtp/verify", requireApiKey, async (_req, res) => {
+  if (!smtpConfigured()) return res.status(400).json({ error: "smtp_not_configured" });
+  try {
+    await verifySmtp();
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ error: "smtp_verify_failed", message: describeMailError(e) });
+  }
+});
+
+// Digitale Signatur Mietvertrag
+app.put("/api/rentals/:rentalId/signature-package", requireApiKey, (req, res) => {
+  const parsed = z.object({ rental: z.object({ id: z.string().min(1) }).passthrough() }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  if (parsed.data.rental.id !== req.params.rentalId) return res.status(400).json({ error: "rental_id_mismatch" });
+  saveRentalSignaturePackage(req.params.rentalId, parsed.data.rental);
+  return res.json({ ok: true });
+});
+
+app.get("/api/rentals/:rentalId/signature-package", requireApiKey, (req, res) => {
+  const result = getRentalSignaturePackage(req.params.rentalId);
+  if (!result) return res.status(404).json({ error: "not_found" });
+  return res.json({ rental: result.rental, signedContract: result.signedContract });
+});
+
+app.get("/public/rentals/:rentalId/signature-package", (req, res) => {
+  const result = getRentalSignaturePackage(req.params.rentalId);
+  if (!result) return res.status(404).json({ error: "not_found" });
+  return res.json({ rental: result.rental, signedContract: result.signedContract });
+});
+
+app.post("/public/rentals/:rentalId/signature-package/sign", (req, res) => {
+  const digitalSignatureSchema = z.object({
+    signer: z.enum(["tenant1", "tenant2"]),
+    signerName: z.string(),
+    signatureDataUrl: z.string().min(1),
+    signedAt: z.string().min(1),
+  });
+  const signedContractSchema = z.object({
+    filename: z.string().min(1),
+    contentBase64: z.string().min(1),
+    contentType: z.string().min(1),
+    uploadedAt: z.string().min(1),
+    signedAt: z.string().min(1),
+    source: z.enum(["digital", "paper"]),
+    digitalSignatures: z.array(digitalSignatureSchema).optional(),
+  });
+  const parsed = z.object({ signedContract: signedContractSchema }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  const saved = saveSignedContract(req.params.rentalId, parsed.data.signedContract);
+  if (!saved) return res.status(404).json({ error: "not_found" });
+  return res.status(201).json({ ok: true });
+});
+
 // Mail Versand
 app.post("/api/mail/send", requireApiKey, async (req, res) => {
   if (!smtpConfigured()) return res.status(400).json({ error: "smtp_not_configured" });
@@ -226,7 +342,7 @@ app.post("/api/mail/send", requireApiKey, async (req, res) => {
     const result = await sendMail(parsed.data);
     return res.status(201).json({ ok: true, messageId: result.messageId });
   } catch (e) {
-    return res.status(500).json({ error: "mail_send_failed", message: e instanceof Error ? e.message : String(e) });
+    return res.status(500).json({ error: "mail_send_failed", message: describeMailError(e) });
   }
 });
 

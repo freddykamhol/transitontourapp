@@ -76,6 +76,43 @@ async function readJson<T>(res: Response): Promise<T> {
   return JSON.parse(text) as T;
 }
 
+function apiErrorText(data: unknown, fallback: string): string {
+  if (!data || typeof data !== "object") return fallback;
+  const value = data as { error?: unknown; message?: unknown };
+  if (typeof value.message === "string" && value.message.trim()) return value.message;
+  if (typeof value.error !== "string") return fallback;
+  switch (value.error) {
+    case "invalid_payload":
+      return "Bitte SMTP-Daten prüfen. Host, Port und Absender müssen gültig sein.";
+    case "smtp_not_configured":
+      return "SMTP ist noch nicht vollständig gespeichert.";
+    case "smtp_to_missing":
+      return "Bitte eine Empfängeradresse für die Testmail eintragen.";
+    case "smtp_test_failed":
+      return "Testmail konnte nicht versendet werden.";
+    case "smtp_verify_failed":
+      return "SMTP-Verbindung konnte nicht aufgebaut werden.";
+    case "mail_send_failed":
+      return "Mail konnte nicht versendet werden.";
+    case "not_found":
+      return "not_found";
+    default:
+      return value.error;
+  }
+}
+
+async function throwApiError(res: Response): Promise<never> {
+  const fallback = `API error: ${res.status}`;
+  let message = fallback;
+  try {
+    const data = await readJson<unknown>(res);
+    message = apiErrorText(data, fallback);
+  } catch {
+    // Ignore non-JSON error bodies and keep the HTTP status fallback.
+  }
+  throw new Error(message);
+}
+
 export async function listRequests(params?: { status?: string; q?: string; limit?: number }): Promise<RequestListItem[]> {
   const search = new URLSearchParams();
   if (params?.status) search.set("status", params.status);
@@ -164,7 +201,89 @@ export async function sendMail(params: {
   attachments?: { filename: string; contentBase64: string; contentType?: string }[];
 }): Promise<{ messageId: string | null }> {
   const res = await apiFetch("/api/mail/send", { method: "POST", body: JSON.stringify(params) });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (!res.ok) await throwApiError(res);
   const data = await readJson<{ messageId?: string | null }>(res);
   return { messageId: data.messageId ?? null };
+}
+
+export type SmtpSettingsResponse = {
+  host: string;
+  port: string;
+  user: string;
+  fromEmail: string;
+  secure: boolean;
+  hasPassword: boolean;
+};
+
+export async function getSmtpSettings(): Promise<SmtpSettingsResponse> {
+  const res = await apiFetch("/api/settings/smtp", { method: "GET" });
+  if (!res.ok) await throwApiError(res);
+  return await readJson<SmtpSettingsResponse>(res);
+}
+
+export async function saveSmtpSettings(params: {
+  host: string;
+  port: string;
+  user?: string;
+  password?: string;
+  fromEmail: string;
+  secure?: boolean;
+}): Promise<void> {
+  const res = await apiFetch("/api/settings/smtp", { method: "PUT", body: JSON.stringify(params) });
+  if (!res.ok) await throwApiError(res);
+}
+
+export async function testSmtpSettings(toEmail?: string): Promise<{ messageId: string | null }> {
+  const res = await apiFetch("/api/settings/smtp/test", { method: "POST", body: JSON.stringify({ toEmail }) });
+  if (!res.ok) await throwApiError(res);
+  const data = await readJson<{ messageId?: string | null }>(res);
+  return { messageId: data.messageId ?? null };
+}
+
+export async function verifySmtpSettings(): Promise<void> {
+  const res = await apiFetch("/api/settings/smtp/verify", { method: "POST", body: JSON.stringify({}) });
+  if (!res.ok) await throwApiError(res);
+}
+
+export async function prepareRentalSignaturePackage(rental: import("../domain/rental").Rental): Promise<void> {
+  const res = await apiFetch(`/api/rentals/${encodeURIComponent(rental.id)}/signature-package`, {
+    method: "PUT",
+    body: JSON.stringify({ rental }),
+  });
+  if (!res.ok) await throwApiError(res);
+}
+
+export async function getRentalSignaturePackage(rentalId: string): Promise<{
+  rental: import("../domain/rental").Rental;
+  signedContract: import("../domain/rental").RentalSignedContract | null;
+}> {
+  const res = await apiFetch(`/api/rentals/${encodeURIComponent(rentalId)}/signature-package`, { method: "GET" });
+  if (!res.ok) await throwApiError(res);
+  return await readJson<{
+    rental: import("../domain/rental").Rental;
+    signedContract: import("../domain/rental").RentalSignedContract | null;
+  }>(res);
+}
+
+export async function getPublicRentalSignaturePackage(rentalId: string): Promise<{
+  rental: import("../domain/rental").Rental;
+  signedContract: import("../domain/rental").RentalSignedContract | null;
+}> {
+  const url = `${portalApiBaseUrl()}/public/rentals/${encodeURIComponent(rentalId)}/signature-package`;
+  const res = await fetch(url, { method: "GET" });
+  if (!res.ok) await throwApiError(res);
+  return await readJson<{
+    rental: import("../domain/rental").Rental;
+    signedContract: import("../domain/rental").RentalSignedContract | null;
+  }>(res);
+}
+
+export async function savePublicRentalSignature(rentalId: string, signedContract: import("../domain/rental").RentalSignedContract): Promise<void> {
+  const url = `${portalApiBaseUrl()}/public/rentals/${encodeURIComponent(rentalId)}/signature-package/sign`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ signedContract }),
+  });
+  if (!res.ok) await throwApiError(res);
 }

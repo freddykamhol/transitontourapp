@@ -6,9 +6,12 @@ import AnfrageDetailsPage from "./pages/anfragen/AnfrageDetailsPage";
 import VermietungenIndexPage from "./pages/rentals/VermietungenIndexPage";
 import VermietungNeuPage from "./pages/rentals/VermietungNeuPage";
 import VermietungDetailsPage from "./pages/rentals/VermietungDetailsPage";
+import RentalSignaturePage from "./pages/rentals/RentalSignaturePage";
 import KalenderPage from "./pages/KalenderPage";
 import EinstellungenPage from "./pages/EinstellungenPage";
 import EinstellungenIntegrationenPage from "./pages/settings/EinstellungenIntegrationenPage";
+import EinstellungenFirmendatenPage from "./pages/settings/EinstellungenFirmendatenPage";
+import EinstellungenLeistungenPage from "./pages/settings/EinstellungenLeistungenPage";
 import EinstellungenStatusPage from "./pages/settings/EinstellungenStatusPage";
 import EinstellungenBenutzerPage from "./pages/settings/EinstellungenBenutzerPage";
 import NotFoundPage from "./pages/NotFoundPage";
@@ -20,6 +23,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="signieren/:rentalId" element={<RentalSignaturePage />} />
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="dashboard" element={<Navigate to="/" replace />} />
@@ -35,6 +39,8 @@ export default function App() {
           <Route path="einstellungen" element={<EinstellungenPage />}>
             <Route index element={<EinstellungenIntegrationenPage />} />
             <Route path="integrationen" element={<EinstellungenIntegrationenPage />} />
+            <Route path="firmendaten" element={<EinstellungenFirmendatenPage />} />
+            <Route path="leistungen" element={<EinstellungenLeistungenPage />} />
             <Route path="status" element={<EinstellungenStatusPage />} />
             <Route path="benutzer" element={<EinstellungenBenutzerPage />} />
           </Route>

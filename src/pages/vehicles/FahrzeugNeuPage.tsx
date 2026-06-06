@@ -6,9 +6,11 @@ import { createVehicle } from "../../storage/vehicleRepo";
 type FormState = {
   licensePlate: string;
   internalNumber: string;
+  category: string;
   brand: string;
   model: string;
   vin: string;
+  registrationDocumentNumber: string;
   status: VehicleStatus;
   notes: string;
 };
@@ -28,9 +30,11 @@ export default function FahrzeugNeuPage() {
   const [form, setForm] = useState<FormState>({
     licensePlate: "",
     internalNumber: "",
+    category: "",
     brand: "",
     model: "",
     vin: "",
+    registrationDocumentNumber: "",
     status: "verfuegbar",
     notes: "",
   });
@@ -57,9 +61,11 @@ export default function FahrzeugNeuPage() {
             const vehicle = createVehicle({
               licensePlate: form.licensePlate.trim().toUpperCase(),
               internalNumber: form.internalNumber.trim() || undefined,
+              category: form.category.trim() || undefined,
               brand: form.brand.trim() || undefined,
               model: form.model.trim() || undefined,
               vin: form.vin.trim() || undefined,
+              registrationDocumentNumber: form.registrationDocumentNumber.trim() || undefined,
               status: form.status,
               notes: form.notes.trim() || undefined,
             });
@@ -87,6 +93,14 @@ export default function FahrzeugNeuPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Fahrzeugart / Kategorie" hint="Optional">
+              <input
+                value={form.category}
+                onChange={(e) => setForm((s) => ({ ...s, category: e.target.value }))}
+                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                placeholder="Wohnmobil, Transporter, PKW"
+              />
+            </Field>
             <Field label="Marke" hint="Optional">
               <input
                 value={form.brand}
@@ -114,6 +128,16 @@ export default function FahrzeugNeuPage() {
                 placeholder="WVWZZZ..."
               />
             </Field>
+            <Field label="Fahrzeugscheinnummer" hint="Optional">
+              <input
+                value={form.registrationDocumentNumber}
+                onChange={(e) => setForm((s) => ({ ...s, registrationDocumentNumber: e.target.value }))}
+                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
             <Field label="Status">
               <select
                 value={form.status}
@@ -157,4 +181,3 @@ export default function FahrzeugNeuPage() {
     </div>
   );
 }
-

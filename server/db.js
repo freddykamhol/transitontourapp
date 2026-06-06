@@ -69,5 +69,19 @@ export function migrate() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_calendar_items_startAt ON calendar_items(startAt);
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      valueJson TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS rental_signature_packages (
+      rentalId TEXT PRIMARY KEY,
+      rentalJson TEXT NOT NULL,
+      signedContractJson TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
   `);
 }

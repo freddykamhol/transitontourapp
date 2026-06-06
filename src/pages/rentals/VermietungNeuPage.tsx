@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import RentalForm from "./components/RentalForm";
-import { createRental } from "../../storage/rentalRepo";
+import { createRental, updateRental } from "../../storage/rentalRepo";
+import { sendRentalDocumentsMail } from "./rentalMail";
 
 export default function VermietungNeuPage() {
   const navigate = useNavigate();
@@ -16,12 +17,29 @@ export default function VermietungNeuPage() {
         mode="create"
         submitLabel="Vermietung speichern"
         onCancel={() => navigate("/vermietungen")}
-        onSubmit={(value) => {
+        onSubmit={async (value) => {
           const rental = createRental(value);
+          try {
+            const result = await sendRentalDocumentsMail(rental);
+            updateRental(rental.id, {
+              contractWorkflow: {
+                ...rental.contractWorkflow,
+                lastSentAt: new Date().toISOString(),
+                lastMessageId: result.messageId,
+                lastError: "",
+              },
+            });
+          } catch (err) {
+            updateRental(rental.id, {
+              contractWorkflow: {
+                ...rental.contractWorkflow,
+                lastError: err instanceof Error ? err.message : "Versand fehlgeschlagen",
+              },
+            });
+          }
           navigate(`/vermietungen/${encodeURIComponent(rental.id)}`);
         }}
       />
     </div>
   );
 }
-

@@ -28,6 +28,8 @@ export default function EinstellungenPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <TabLink to="/einstellungen/integrationen" label="Integrationen" />
+            <TabLink to="/einstellungen/firmendaten" label="Firmendaten" />
+            <TabLink to="/einstellungen/leistungen" label="Leistungen" />
             <TabLink to="/einstellungen/status" label="Status" />
             <TabLink to="/einstellungen/benutzer" label="Benutzer" />
           </div>

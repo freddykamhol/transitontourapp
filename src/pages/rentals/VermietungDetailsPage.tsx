@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { Rental } from "../../domain/rental";
-import { sendMail } from "../../api/portalApi";
+import { getRentalSignaturePackage, sendMail } from "../../api/portalApi";
 import { deleteRental, getRental, getRentalStatus, markReturned, updateRental } from "../../storage/rentalRepo";
 import RentalForm from "./components/RentalForm";
+import { sendRentalDocumentsMail } from "./rentalMail";
 import {
   buildDamageListPdf,
   buildInvoicePdf,
@@ -71,6 +72,23 @@ async function arrayBufferToBase64(buf: ArrayBuffer): Promise<string> {
   return btoa(binary);
 }
 
+async function fileToBase64(file: File): Promise<string> {
+  return await arrayBufferToBase64(await file.arrayBuffer());
+}
+
+function downloadBase64File(filename: string, contentBase64: string, contentType: string): void {
+  const bytes = Uint8Array.from(atob(contentBase64), (char) => char.charCodeAt(0));
+  const blob = new Blob([bytes], { type: contentType || "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function VermietungDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,6 +105,9 @@ export default function VermietungDetailsPage() {
   const [sendOpen, setSendOpen] = useState<{ doc: "vertrag" | "schaden" | "rechnung" } | null>(null);
   const [sendBusy, setSendBusy] = useState(false);
   const [sendError, setSendError] = useState<string>("");
+  const [bundleSendBusy, setBundleSendBusy] = useState(false);
+  const [bundleSendError, setBundleSendError] = useState("");
+  const [uploadBusy, setUploadBusy] = useState(false);
   const [sendForm, setSendForm] = useState<{
     toCustomer: boolean;
     toUser: boolean;
@@ -106,6 +127,31 @@ export default function VermietungDetailsPage() {
   const rental = useMemo(() => getRental(rentalId), [rentalId]);
   const meta = useMemo(() => (rental ? getRentalStatus(rental, new Date()) : null), [rental]);
   const running = rental ? isRunning(rental) : false;
+  const signedContract = rental?.contractWorkflow?.signedContract;
+
+  useEffect(() => {
+    if (!rental) return;
+    let cancelled = false;
+    getRentalSignaturePackage(rental.id)
+      .then((data) => {
+        if (cancelled || !data.signedContract) return;
+        if (rental.contractWorkflow?.signedContract?.signedAt === data.signedContract.signedAt) return;
+        updateRental(rental.id, {
+          contractWorkflow: {
+            ...rental.contractWorkflow,
+            digitalSignatures: data.signedContract.digitalSignatures,
+            signedContract: data.signedContract,
+          },
+        });
+        navigate(0);
+      })
+      .catch(() => {
+        // Signature package may not exist yet for older rentals.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, rental]);
 
   const docDefs = useMemo(() => {
     if (!rental) return [];
@@ -192,6 +238,40 @@ export default function VermietungDetailsPage() {
             </button>
             <button
               type="button"
+              disabled={bundleSendBusy}
+              onClick={async () => {
+                setBundleSendBusy(true);
+                setBundleSendError("");
+                try {
+                  const result = await sendRentalDocumentsMail(rental);
+                  updateRental(rental.id, {
+                    contractWorkflow: {
+                      ...rental.contractWorkflow,
+                      lastSentAt: new Date().toISOString(),
+                      lastMessageId: result.messageId,
+                      lastError: "",
+                    },
+                  });
+                  navigate(0);
+                } catch (err) {
+                  const message = err instanceof Error ? err.message : "Versand fehlgeschlagen";
+                  updateRental(rental.id, {
+                    contractWorkflow: {
+                      ...rental.contractWorkflow,
+                      lastError: message,
+                    },
+                  });
+                  setBundleSendError(message);
+                } finally {
+                  setBundleSendBusy(false);
+                }
+              }}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Unterlagen erneut senden {bundleSendBusy ? "…" : ""}
+            </button>
+            <button
+              type="button"
               onClick={() => downloadInvoicePdf(rental)}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
             >
@@ -199,6 +279,19 @@ export default function VermietungDetailsPage() {
             </button>
           </div>
         </div>
+
+        {bundleSendError || rental.contractWorkflow?.lastSentAt || rental.contractWorkflow?.lastError ? (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            {rental.contractWorkflow?.lastSentAt ? (
+              <div>
+                Unterlagen zuletzt versendet: <span className="font-semibold text-slate-900">{formatDateTime(rental.contractWorkflow.lastSentAt)}</span>
+              </div>
+            ) : null}
+            {bundleSendError || rental.contractWorkflow?.lastError ? (
+              <div className="mt-1 font-semibold text-rose-700">Mailversand: {bundleSendError || rental.contractWorkflow?.lastError}</div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="grid gap-1 text-xs text-slate-600">
@@ -337,6 +430,71 @@ export default function VermietungDetailsPage() {
         </div>
 
         <div className="mt-3 text-[11px] text-slate-500">„Geschützter Download“ ist aktuell ein Passwort-Dialog vor dem Download (kein PDF-Passwort).</div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold tracking-tight">Unterschriebener Vertrag</h3>
+            <p className="mt-1 text-xs text-slate-500">Digital signierter Vertrag oder papierhaft unterschriebener Upload.</p>
+          </div>
+          <label className="inline-flex cursor-pointer items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+            Upload
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              className="sr-only"
+              disabled={uploadBusy}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.currentTarget.value = "";
+                if (!file) return;
+                setUploadBusy(true);
+                try {
+                  const contentBase64 = await fileToBase64(file);
+                  updateRental(rental.id, {
+                    contractWorkflow: {
+                      ...rental.contractWorkflow,
+                      signedContract: {
+                        filename: file.name,
+                        contentBase64,
+                        contentType: file.type || "application/pdf",
+                        uploadedAt: new Date().toISOString(),
+                        signedAt: new Date().toISOString(),
+                        source: "paper",
+                      },
+                    },
+                  });
+                  navigate(0);
+                } finally {
+                  setUploadBusy(false);
+                }
+              }}
+            />
+          </label>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          {signedContract ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-900">{signedContract.filename}</div>
+                <div className="mt-1 text-xs text-slate-600">
+                  Signiert: {formatDateTime(signedContract.signedAt)} • Quelle: {signedContract.source === "paper" ? "Papierform" : "Digital"}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                onClick={() => downloadBase64File(signedContract.filename, signedContract.contentBase64, signedContract.contentType)}
+              >
+                Unterschriebenen Vertrag herunterladen
+              </button>
+            </div>
+          ) : (
+            <div className="text-sm text-slate-600">Noch kein unterschriebener Vertrag hinterlegt.</div>
+          )}
+        </div>
       </section>
 
       {editing ? (

@@ -4,6 +4,8 @@ export type RentalParty = {
   name: string;
   email: string;
   phone?: string;
+  birthDate?: string;
+  identityCardNumber?: string;
   addressLine1?: string;
   addressLine2?: string;
   postalCode?: string;
@@ -17,8 +19,11 @@ export type RentalParty = {
 export type RentalVehicleRef = {
   vehicleId: string;
   label: string; // z.B. "VW T6 (B-AB 1234)"
+  category?: string;
+  type?: string;
   licensePlate?: string;
   vin?: string;
+  registrationDocumentNumber?: string;
 };
 
 export type RentalInsurance = {
@@ -29,9 +34,12 @@ export type RentalInsurance = {
 
 export type RentalAddon = {
   id: string;
+  serviceId?: string;
   name: string;
+  hint?: string;
   qty: number;
   unitPriceEur?: number;
+  vatRate?: number;
 };
 
 export type RentalPayment = {
@@ -40,8 +48,38 @@ export type RentalPayment = {
   totalEur: number;
   paidEur: number;
   depositEur?: number;
+  dueKind?: "days" | "date";
+  dueDays?: number;
+  dueDate?: string;
   invoiceNumber?: string;
   notes?: string;
+};
+
+export type RentalSignerKey = "tenant1" | "tenant2";
+
+export type RentalDigitalSignature = {
+  signer: RentalSignerKey;
+  signerName: string;
+  signatureDataUrl: string;
+  signedAt: string;
+};
+
+export type RentalSignedContract = {
+  filename: string;
+  contentBase64: string;
+  contentType: string;
+  uploadedAt: string;
+  signedAt: string;
+  source: "digital" | "paper";
+  digitalSignatures?: RentalDigitalSignature[];
+};
+
+export type RentalContractWorkflow = {
+  lastSentAt?: string;
+  lastMessageId?: string | null;
+  lastError?: string;
+  digitalSignatures?: RentalDigitalSignature[];
+  signedContract?: RentalSignedContract;
 };
 
 export type Rental = {
@@ -72,6 +110,7 @@ export type Rental = {
   // Zahlung
   payment: RentalPayment;
 
+  contractWorkflow?: RentalContractWorkflow;
   internalNotes?: string;
 };
 
@@ -79,4 +118,3 @@ export type RentalDb = {
   version: 1;
   rentals: Rental[];
 };
-

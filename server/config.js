@@ -30,19 +30,6 @@ export const config = {
   apiKey: required("PORTAL_API_KEY"),
   calendarToken: optional("PORTAL_CALENDAR_TOKEN", ""),
   dbPath: optional("PORTAL_DB_PATH", "./data/portal.sqlite"),
-  smtp: (() => {
-    const host = optional("SMTP_HOST", "");
-    const fromEmail = optional("SMTP_FROM", "");
-    if (!host && !fromEmail) return null;
-    return {
-      host,
-      port: optional("SMTP_PORT", "587"),
-      user: optional("SMTP_USER", ""),
-      password: optional("SMTP_PASS", ""),
-      fromEmail,
-      secure: optional("SMTP_SECURE", "false") === "true",
-    };
-  })(),
   allowedOrigins: optional("PORTAL_ALLOWED_ORIGINS", "")
     .split(",")
     .map((s) => s.trim())

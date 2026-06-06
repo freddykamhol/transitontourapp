@@ -9,9 +9,11 @@ export type Vehicle = {
 
   internalNumber?: string;
   licensePlate: string;
+  category?: string;
   brand?: string;
   model?: string;
   vin?: string;
+  registrationDocumentNumber?: string;
 
   status: VehicleStatus;
   notes?: string;

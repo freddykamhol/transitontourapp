@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { portalApiBaseUrl, portalCalendarToken } from "../../api/portalApi";
+import { useEffect, useMemo, useState } from "react";
+import { getSmtpSettings, portalApiBaseUrl, portalCalendarToken, saveSmtpSettings, testSmtpSettings, verifySmtpSettings } from "../../api/portalApi";
 
 type SmtpSettings = {
   host: string;
@@ -8,35 +8,27 @@ type SmtpSettings = {
   password: string;
   fromEmail: string;
   secure: boolean;
+  hasPassword: boolean;
 };
 
-const SMTP_KEY = "tot.settings.smtp.v1";
-
-function loadSmtp(): SmtpSettings {
-  try {
-    const raw = localStorage.getItem(SMTP_KEY);
-    if (!raw) throw new Error("missing");
-    const parsed = JSON.parse(raw) as Partial<SmtpSettings>;
-    return {
-      host: parsed.host ?? "",
-      port: parsed.port ?? "587",
-      user: parsed.user ?? "",
-      password: parsed.password ?? "",
-      fromEmail: parsed.fromEmail ?? "",
-      secure: Boolean(parsed.secure),
-    };
-  } catch {
-    return { host: "", port: "587", user: "", password: "", fromEmail: "", secure: false };
-  }
+function emptySmtp(): SmtpSettings {
+  return { host: "", port: "587", user: "", password: "", fromEmail: "", secure: false, hasPassword: false };
 }
 
-function saveSmtp(value: SmtpSettings) {
-  localStorage.setItem(SMTP_KEY, JSON.stringify(value));
+function validateSmtp(value: SmtpSettings): string {
+  if (!value.host.trim()) return "Bitte SMTP-Host eintragen.";
+  const port = Number(value.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return "Bitte einen gültigen SMTP-Port eintragen.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.fromEmail.trim())) return "Bitte eine gültige Absender-E-Mail eintragen.";
+  return "";
 }
 
 export default function EinstellungenIntegrationenPage() {
-  const [smtp, setSmtp] = useState<SmtpSettings>(() => loadSmtp());
+  const [smtp, setSmtp] = useState<SmtpSettings>(() => emptySmtp());
   const [savedAt, setSavedAt] = useState<string>("");
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState<"load" | "save" | "verify" | "test" | "">("load");
+  const [testEmail, setTestEmail] = useState("");
 
   const webcalHttpUrl = useMemo(() => {
     const token = portalCalendarToken();
@@ -45,11 +37,31 @@ export default function EinstellungenIntegrationenPage() {
   }, []);
   const webcalUrl = useMemo(() => webcalHttpUrl.replace(/^https?:\/\//, "webcal://"), [webcalHttpUrl]);
 
+  useEffect(() => {
+    let cancelled = false;
+    getSmtpSettings()
+      .then((value) => {
+        if (cancelled) return;
+        setSmtp({ ...value, password: "" });
+        setTestEmail(value.fromEmail);
+        setStatus(value.host ? "SMTP-Konfiguration geladen." : "Noch keine SMTP-Konfiguration gespeichert.");
+      })
+      .catch((err) => {
+        if (!cancelled) setStatus(err instanceof Error ? err.message : "SMTP-Konfiguration konnte nicht geladen werden.");
+      })
+      .finally(() => {
+        if (!cancelled) setBusy("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="grid gap-6">
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="text-sm font-semibold tracking-tight">SMTP (Mail)</h3>
-        <p className="mt-1 text-xs text-slate-500">Platzhalter: Wird später für Versand/Benachrichtigungen genutzt.</p>
+        <p className="mt-1 text-xs text-slate-500">Diese Daten nutzt der Server für Mietunterlagen, Antworten und Benachrichtigungen.</p>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="grid gap-1">
@@ -86,8 +98,9 @@ export default function EinstellungenIntegrationenPage() {
               value={smtp.password}
               onChange={(e) => setSmtp((s) => ({ ...s, password: e.target.value }))}
               className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
-              placeholder="••••••••"
+              placeholder={smtp.hasPassword ? "gespeichert - leer lassen zum Beibehalten" : "••••••••"}
             />
+            {smtp.hasPassword ? <span className="text-xs text-slate-500">Ein Passwort ist gespeichert. Ein neues Passwort ersetzt es.</span> : null}
           </label>
           <label className="grid gap-1 md:col-span-2">
             <span className="text-xs font-semibold text-slate-600">Absender (From)</span>
@@ -104,18 +117,105 @@ export default function EinstellungenIntegrationenPage() {
           </label>
         </div>
 
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <label className="grid gap-1">
+            <span className="text-xs font-semibold text-slate-600">Testmail an</span>
+            <input
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
+              placeholder="test@example.com"
+            />
+          </label>
+        </div>
+
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs font-semibold text-slate-500">{savedAt ? `Gespeichert: ${savedAt}` : "Noch nicht gespeichert"}</div>
-          <button
-            type="button"
-            className="inline-flex items-center rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 active:translate-y-px"
-            onClick={() => {
-              saveSmtp(smtp);
-              setSavedAt(new Date().toLocaleString());
-            }}
-          >
-            Speichern
-          </button>
+          <div className="text-xs font-semibold text-slate-500">
+            {savedAt ? `Gespeichert: ${savedAt}` : status || "Noch nicht gespeichert"}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={busy === "load" || busy === "save"}
+              className="inline-flex items-center rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={async () => {
+                const validationError = validateSmtp(smtp);
+                if (validationError) {
+                  setStatus(validationError);
+                  return;
+                }
+                setBusy("save");
+                setStatus("");
+                try {
+                  await saveSmtpSettings(smtp);
+                  setSmtp((s) => ({ ...s, password: "", hasPassword: s.hasPassword || Boolean(s.password) }));
+                  setSavedAt(new Date().toLocaleString());
+                  setStatus("SMTP gespeichert.");
+                } catch (err) {
+                  setStatus(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
+                } finally {
+                  setBusy("");
+                }
+              }}
+            >
+              Speichern {busy === "save" ? "…" : ""}
+            </button>
+            <button
+              type="button"
+              disabled={busy === "load" || busy === "verify"}
+              className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={async () => {
+                const validationError = validateSmtp(smtp);
+                if (validationError) {
+                  setStatus(validationError);
+                  return;
+                }
+                setBusy("verify");
+                setStatus("");
+                try {
+                  await saveSmtpSettings(smtp);
+                  setSmtp((s) => ({ ...s, password: "", hasPassword: s.hasPassword || Boolean(s.password) }));
+                  setSavedAt(new Date().toLocaleString());
+                  await verifySmtpSettings();
+                  setStatus("SMTP-Verbindung erfolgreich geprüft.");
+                } catch (err) {
+                  setStatus(err instanceof Error ? err.message : "SMTP-Verbindung fehlgeschlagen.");
+                } finally {
+                  setBusy("");
+                }
+              }}
+            >
+              Verbindung prüfen {busy === "verify" ? "…" : ""}
+            </button>
+            <button
+              type="button"
+              disabled={busy === "load" || busy === "test"}
+              className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={async () => {
+                const validationError = validateSmtp(smtp);
+                if (validationError) {
+                  setStatus(validationError);
+                  return;
+                }
+                setBusy("test");
+                setStatus("");
+                try {
+                  await saveSmtpSettings(smtp);
+                  setSmtp((s) => ({ ...s, password: "", hasPassword: s.hasPassword || Boolean(s.password) }));
+                  setSavedAt(new Date().toLocaleString());
+                  await testSmtpSettings(testEmail || undefined);
+                  setStatus("SMTP gespeichert und Testmail versendet.");
+                } catch (err) {
+                  setStatus(err instanceof Error ? err.message : "Testmail fehlgeschlagen.");
+                } finally {
+                  setBusy("");
+                }
+              }}
+            >
+              Testmail senden {busy === "test" ? "…" : ""}
+            </button>
+          </div>
         </div>
       </section>
 
