@@ -212,12 +212,17 @@ app.get("/api/settings/smtp", requireApiKey, (_req, res) => {
     port: String(smtp.port ?? "587"),
     user: smtp.user ?? "",
     fromEmail: smtp.fromEmail ?? "",
+    testEmail: smtp.testEmail ?? smtp.fromEmail ?? "",
     secure: Boolean(smtp.secure),
     hasPassword: Boolean(smtp.password),
   });
 });
 
 app.put("/api/settings/smtp", requireApiKey, (req, res) => {
+  const shouldReplacePassword = (value) => {
+    if (!value || value.length === 0) return false;
+    return !/^[•●*]+$/.test(value.trim());
+  };
   const parsed = z
     .object({
       host: z.string().trim().min(1),
@@ -225,6 +230,7 @@ app.put("/api/settings/smtp", requireApiKey, (req, res) => {
       user: z.string().trim().optional().default(""),
       password: z.string().optional(),
       fromEmail: z.string().trim().email(),
+      testEmail: z.string().trim().email().optional().or(z.literal("")),
       secure: z.boolean().optional().default(false),
     })
     .safeParse(req.body);
@@ -235,8 +241,9 @@ app.put("/api/settings/smtp", requireApiKey, (req, res) => {
     host: parsed.data.host,
     port: String(parsed.data.port),
     user: parsed.data.user,
-    password: parsed.data.password && parsed.data.password.length > 0 ? parsed.data.password : existing.password ?? "",
+    password: shouldReplacePassword(parsed.data.password) ? parsed.data.password : existing.password ?? "",
     fromEmail: parsed.data.fromEmail,
+    testEmail: parsed.data.testEmail || parsed.data.fromEmail,
     secure: parsed.data.secure,
   });
 
@@ -249,7 +256,7 @@ app.post("/api/settings/smtp/test", requireApiKey, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
 
   const smtp = getSmtpSettings() ?? {};
-  const toEmail = parsed.data.toEmail ?? smtp.fromEmail;
+  const toEmail = parsed.data.toEmail ?? smtp.testEmail ?? smtp.fromEmail;
   if (!toEmail) return res.status(400).json({ error: "smtp_to_missing" });
 
   try {

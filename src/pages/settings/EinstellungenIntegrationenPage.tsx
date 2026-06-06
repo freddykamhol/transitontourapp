@@ -7,12 +7,13 @@ type SmtpSettings = {
   user: string;
   password: string;
   fromEmail: string;
+  testEmail: string;
   secure: boolean;
   hasPassword: boolean;
 };
 
 function emptySmtp(): SmtpSettings {
-  return { host: "", port: "587", user: "", password: "", fromEmail: "", secure: false, hasPassword: false };
+  return { host: "", port: "587", user: "", password: "", fromEmail: "", testEmail: "", secure: false, hasPassword: false };
 }
 
 function validateSmtp(value: SmtpSettings): string {
@@ -21,6 +22,11 @@ function validateSmtp(value: SmtpSettings): string {
   if (!Number.isInteger(port) || port < 1 || port > 65535) return "Bitte einen gültigen SMTP-Port eintragen.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.fromEmail.trim())) return "Bitte eine gültige Absender-E-Mail eintragen.";
   return "";
+}
+
+function normalizeSmtpForSave(value: SmtpSettings, testEmail: string): SmtpSettings {
+  const password = /^[•●*]+$/.test(value.password.trim()) ? "" : value.password;
+  return { ...value, password, testEmail };
 }
 
 export default function EinstellungenIntegrationenPage() {
@@ -43,7 +49,7 @@ export default function EinstellungenIntegrationenPage() {
       .then((value) => {
         if (cancelled) return;
         setSmtp({ ...value, password: "" });
-        setTestEmail(value.fromEmail);
+        setTestEmail(value.testEmail || value.fromEmail);
         setStatus(value.host ? "SMTP-Konfiguration geladen." : "Noch keine SMTP-Konfiguration gespeichert.");
       })
       .catch((err) => {
@@ -123,7 +129,10 @@ export default function EinstellungenIntegrationenPage() {
             <input
               type="email"
               value={testEmail}
-              onChange={(e) => setTestEmail(e.target.value)}
+              onChange={(e) => {
+                setTestEmail(e.target.value);
+                setSmtp((s) => ({ ...s, testEmail: e.target.value }));
+              }}
               className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
               placeholder="test@example.com"
             />
@@ -148,7 +157,7 @@ export default function EinstellungenIntegrationenPage() {
                 setBusy("save");
                 setStatus("");
                 try {
-                  await saveSmtpSettings(smtp);
+                  await saveSmtpSettings(normalizeSmtpForSave(smtp, testEmail));
                   setSmtp((s) => ({ ...s, password: "", hasPassword: s.hasPassword || Boolean(s.password) }));
                   setSavedAt(new Date().toLocaleString());
                   setStatus("SMTP gespeichert.");
@@ -174,7 +183,7 @@ export default function EinstellungenIntegrationenPage() {
                 setBusy("verify");
                 setStatus("");
                 try {
-                  await saveSmtpSettings(smtp);
+                  await saveSmtpSettings(normalizeSmtpForSave(smtp, testEmail));
                   setSmtp((s) => ({ ...s, password: "", hasPassword: s.hasPassword || Boolean(s.password) }));
                   setSavedAt(new Date().toLocaleString());
                   await verifySmtpSettings();
@@ -201,7 +210,7 @@ export default function EinstellungenIntegrationenPage() {
                 setBusy("test");
                 setStatus("");
                 try {
-                  await saveSmtpSettings(smtp);
+                  await saveSmtpSettings(normalizeSmtpForSave(smtp, testEmail));
                   setSmtp((s) => ({ ...s, password: "", hasPassword: s.hasPassword || Boolean(s.password) }));
                   setSavedAt(new Date().toLocaleString());
                   await testSmtpSettings(testEmail || undefined);

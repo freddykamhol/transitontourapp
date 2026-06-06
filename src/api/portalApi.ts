@@ -211,6 +211,7 @@ export type SmtpSettingsResponse = {
   port: string;
   user: string;
   fromEmail: string;
+  testEmail: string;
   secure: boolean;
   hasPassword: boolean;
 };
@@ -227,6 +228,7 @@ export async function saveSmtpSettings(params: {
   user?: string;
   password?: string;
   fromEmail: string;
+  testEmail?: string;
   secure?: boolean;
 }): Promise<void> {
   const res = await apiFetch("/api/settings/smtp", { method: "PUT", body: JSON.stringify(params) });
