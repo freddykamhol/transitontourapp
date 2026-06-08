@@ -30,6 +30,23 @@ function Section(props: { title: string; description?: string; children: React.R
   );
 }
 
+function KindCard(props: { active: boolean; title: string; description: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={props.disabled}
+      onClick={props.onClick}
+      className={[
+        "rounded-3xl border p-5 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
+        props.active ? "border-slate-900 bg-slate-900 text-white shadow-sm" : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
+      ].join(" ")}
+    >
+      <div className="text-sm font-semibold">{props.title}</div>
+      <div className={props.active ? "mt-2 text-xs text-slate-200" : "mt-2 text-xs text-slate-500"}>{props.description}</div>
+    </button>
+  );
+}
+
 function toLocalDateTime(iso: string | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -173,6 +190,25 @@ export default function RentalForm(props: {
         props.onSubmit({ ...state, vehicle: state.vehicle });
       }}
     >
+      <Section title="Art der Vermietung" description="Zuerst auswählen, ob ein Fahrzeug oder ein Gerät vermietet wird. Danach ändern sich die Angaben passend.">
+        <div className="grid gap-4 md:grid-cols-2">
+          <KindCard
+            active={state.rentalKind === "vehicle"}
+            title="Fahrzeug"
+            description="Fahrzeugmiete mit Kennzeichen, Fahrern, Führerscheindaten, Versicherung und Fahrzeugbedingungen."
+            disabled={Boolean(readOnly.vehicle)}
+            onClick={() => setState((s) => ({ ...s, rentalKind: "vehicle", vehicle: s.vehicle?.kind === "vehicle" ? s.vehicle : null }))}
+          />
+          <KindCard
+            active={state.rentalKind === "equipment"}
+            title="Gerät"
+            description="Gerätemiete mit Nutzerangaben, Gerätezustand, Zubehör/Vollständigkeit und Geräte-Mietbedingungen."
+            disabled={Boolean(readOnly.vehicle)}
+            onClick={() => setState((s) => ({ ...s, rentalKind: "equipment", vehicle: s.vehicle?.kind === "equipment" ? s.vehicle : null }))}
+          />
+        </div>
+      </Section>
+
       <Section title="Termine" description="Schnell: Start/Ende setzen. Wenn eine Miete läuft, kann nur die Rückgabe angepasst werden.">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Start">
@@ -198,7 +234,10 @@ export default function RentalForm(props: {
         </div>
       </Section>
 
-      <Section title="Mieter" description="Kontaktdaten + Führerschein optional.">
+      <Section
+        title="Mieter"
+        description={state.rentalKind === "equipment" ? "Kontaktdaten und Identifikation für die Gerätemiete." : "Kontaktdaten + Führerschein optional."}
+      >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Name">
             <input
@@ -272,60 +311,39 @@ export default function RentalForm(props: {
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
             />
           </Field>
-          <Field label="Führerschein-Nr. (optional)">
-            <input
-              value={state.tenant.driverLicenseNumber ?? ""}
-              disabled={Boolean(readOnly.tenant)}
-              onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, driverLicenseNumber: e.target.value } }))}
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
-            />
-          </Field>
-          <Field label="Ausstellungsort (optional)">
-            <input
-              value={state.tenant.driverLicenseIssuedBy ?? ""}
-              disabled={Boolean(readOnly.tenant)}
-              onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, driverLicenseIssuedBy: e.target.value } }))}
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
-            />
-          </Field>
-          <Field label="Gültig bis (optional)">
-            <input
-              type="date"
-              value={(state.tenant.driverLicenseValidUntil ?? "").slice(0, 10)}
-              disabled={Boolean(readOnly.tenant)}
-              onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, driverLicenseValidUntil: e.target.value ? `${e.target.value}T00:00:00.000Z` : "" } }))}
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
-            />
-          </Field>
+          {state.rentalKind === "vehicle" ? (
+            <>
+              <Field label="Führerschein-Nr. (optional)">
+                <input
+                  value={state.tenant.driverLicenseNumber ?? ""}
+                  disabled={Boolean(readOnly.tenant)}
+                  onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, driverLicenseNumber: e.target.value } }))}
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                />
+              </Field>
+              <Field label="Ausstellungsort (optional)">
+                <input
+                  value={state.tenant.driverLicenseIssuedBy ?? ""}
+                  disabled={Boolean(readOnly.tenant)}
+                  onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, driverLicenseIssuedBy: e.target.value } }))}
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                />
+              </Field>
+              <Field label="Gültig bis (optional)">
+                <input
+                  type="date"
+                  value={(state.tenant.driverLicenseValidUntil ?? "").slice(0, 10)}
+                  disabled={Boolean(readOnly.tenant)}
+                  onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, driverLicenseValidUntil: e.target.value ? `${e.target.value}T00:00:00.000Z` : "" } }))}
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                />
+              </Field>
+            </>
+          ) : null}
         </div>
       </Section>
 
       <Section title="Mietgegenstand" description="Fahrzeug oder Gerät aus dem Bestand wählen.">
-        <div className="mb-4 inline-flex rounded-3xl border border-slate-200 bg-slate-50 p-1">
-          <button
-            type="button"
-            disabled={Boolean(readOnly.vehicle)}
-            onClick={() => setState((s) => ({ ...s, rentalKind: "vehicle", vehicle: s.vehicle?.kind === "vehicle" ? s.vehicle : null }))}
-            className={[
-              "rounded-2xl px-4 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
-              state.rentalKind === "vehicle" ? "bg-slate-900 text-white shadow-sm" : "bg-white text-slate-700 hover:bg-slate-50",
-            ].join(" ")}
-          >
-            Fahrzeug
-          </button>
-          <button
-            type="button"
-            disabled={Boolean(readOnly.vehicle)}
-            onClick={() => setState((s) => ({ ...s, rentalKind: "equipment", vehicle: s.vehicle?.kind === "equipment" ? s.vehicle : null }))}
-            className={[
-              "rounded-2xl px-4 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
-              state.rentalKind === "equipment" ? "bg-slate-900 text-white shadow-sm" : "bg-white text-slate-700 hover:bg-slate-50",
-            ].join(" ")}
-          >
-            Gerät
-          </button>
-        </div>
-
         <div className="grid gap-4 md:grid-cols-2">
           <Field label={state.rentalKind === "equipment" ? "Gerät auswählen" : "Fahrzeug auswählen"}>
             <select
@@ -377,26 +395,28 @@ export default function RentalForm(props: {
       </Section>
 
       <Section
-        title="Zusatzfahrer"
-        description="Optional. Für Prozess: zuerst Name/E-Mail reicht, Details später."
+        title={state.rentalKind === "equipment" ? "Zusätzliche Nutzer" : "Zusatzfahrer"}
+        description={state.rentalKind === "equipment" ? "Optional: weitere berechtigte Nutzer des Geräts." : "Optional. Für Prozess: zuerst Name/E-Mail reicht, Details später."}
         right={
           <button
             type="button"
             className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
             onClick={() => setState((s) => ({ ...s, additionalDrivers: [...s.additionalDrivers, defaultTenant()] }))}
           >
-            Zusatzfahrer hinzufügen
+            {state.rentalKind === "equipment" ? "Nutzer hinzufügen" : "Zusatzfahrer hinzufügen"}
           </button>
         }
       >
         {state.additionalDrivers.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Keine Zusatzfahrer.</div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+            {state.rentalKind === "equipment" ? "Keine zusätzlichen Nutzer." : "Keine Zusatzfahrer."}
+          </div>
         ) : (
           <div className="grid gap-3">
             {state.additionalDrivers.map((d, idx) => (
               <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="text-sm font-semibold">Zusatzfahrer #{idx + 1}</div>
+                  <div className="text-sm font-semibold">{state.rentalKind === "equipment" ? "Zusätzlicher Nutzer" : "Zusatzfahrer"} #{idx + 1}</div>
                   <button
                     type="button"
                     className="text-xs font-semibold text-rose-700 hover:text-rose-800"
@@ -495,18 +515,20 @@ export default function RentalForm(props: {
                       className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
                     />
                   </Field>
-                  <Field label="Führerscheinnummer">
-                    <input
-                      value={d.driverLicenseNumber ?? ""}
-                      onChange={(e) =>
-                        setState((s) => ({
-                          ...s,
-                          additionalDrivers: s.additionalDrivers.map((x, i) => (i === idx ? { ...x, driverLicenseNumber: e.target.value } : x)),
-                        }))
-                      }
-                      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
-                    />
-                  </Field>
+                  {state.rentalKind === "vehicle" ? (
+                    <Field label="Führerscheinnummer">
+                      <input
+                        value={d.driverLicenseNumber ?? ""}
+                        onChange={(e) =>
+                          setState((s) => ({
+                            ...s,
+                            additionalDrivers: s.additionalDrivers.map((x, i) => (i === idx ? { ...x, driverLicenseNumber: e.target.value } : x)),
+                          }))
+                        }
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                      />
+                    </Field>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -514,7 +536,10 @@ export default function RentalForm(props: {
         )}
       </Section>
 
-      <Section title="Versicherung" description="Schnelle Auswahl + Selbstbeteiligung optional.">
+      <Section
+        title={state.rentalKind === "equipment" ? "Absicherung" : "Versicherung"}
+        description={state.rentalKind === "equipment" ? "Optionale Absicherung, Kaution oder Haftungshinweise für die Gerätemiete." : "Schnelle Auswahl + Selbstbeteiligung optional."}
+      >
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="Paket">
             <select
@@ -522,12 +547,12 @@ export default function RentalForm(props: {
               onChange={(e) => setState((s) => ({ ...s, insurance: { ...s.insurance, kind: e.target.value as RentalInsurance["kind"] } }))}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
             >
-              <option value="basis">Basis</option>
-              <option value="vollkasko">Vollkasko</option>
-              <option value="premium">Premium</option>
+              <option value="basis">{state.rentalKind === "equipment" ? "Ohne Zusatzabsicherung" : "Basis"}</option>
+              <option value="vollkasko">{state.rentalKind === "equipment" ? "Geräteschutz" : "Vollkasko"}</option>
+              <option value="premium">{state.rentalKind === "equipment" ? "Premium-Geräteschutz" : "Premium"}</option>
             </select>
           </Field>
-          <Field label="Selbstbeteiligung (EUR)">
+          <Field label={state.rentalKind === "equipment" ? "Kaution / Selbstbeteiligung (EUR)" : "Selbstbeteiligung (EUR)"}>
             <input
               type="number"
               min={0}
