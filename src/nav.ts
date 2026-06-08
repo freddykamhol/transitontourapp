@@ -16,7 +16,7 @@ export type NavItem = {
 
 export const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "fahrzeug", label: "Fahrzeug", icon: Car },
+  { to: "fahrzeug", label: "Inventar", icon: Car },
   { to: "anfragen", label: "Anfragen", icon: Ticket },
   { to: "vermietungen", label: "Vermietungen", icon: ClipboardList },
   { to: "kalender", label: "Kalender", icon: CalendarDays },

@@ -57,7 +57,9 @@ export default function DashboardPage() {
   const [requestsError, setRequestsError] = useState<string | null>(null);
 
   const rentals = useMemo(() => listRentals(), []);
-  const vehicles = useMemo(() => listVehicles(), []);
+  const inventory = useMemo(() => listVehicles(), []);
+  const vehicles = useMemo(() => inventory.filter((item) => (item.kind ?? "vehicle") === "vehicle"), [inventory]);
+  const equipment = useMemo(() => inventory.filter((item) => (item.kind ?? "vehicle") === "equipment"), [inventory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,8 +136,8 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Fahrzeuge" value={vehicles.length.toString()} hint="Bestand gesamt" to="/fahrzeuge" />
-        <StatCard label="Schäden offen" value={vehicles.reduce((sum, vehicle) => sum + vehicle.openDamages, 0).toString()} hint="Alle erfassten Schadenspunkte" to="/fahrzeuge" />
+        <StatCard label="Fahrzeuge" value={vehicles.length.toString()} hint={`${equipment.length} Gerät(e) im Inventar`} to="/fahrzeug" />
+        <StatCard label="Schäden offen" value={inventory.reduce((sum, item) => sum + item.openDamages, 0).toString()} hint="Alle erfassten Schadenspunkte" to="/fahrzeug" />
         <StatCard label="Anfragen neu" value={requestsLoading ? "…" : requestStats.new.toString()} hint={requestsError ?? `${requestStats.open} offen gesamt`} to="/anfragen" />
         <StatCard label="Anfragen in Arbeit" value={requestsLoading ? "…" : requestStats.inProgress.toString()} hint={`${requestStats.total} Anfragen geladen`} to="/anfragen" />
       </section>

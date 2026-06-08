@@ -1,5 +1,7 @@
 export type Id = string;
 
+export type InventoryKind = "vehicle" | "equipment";
+
 export type VehicleStatus = "verfuegbar" | "vermietet" | "wartung" | "inaktiv";
 
 export type Vehicle = {
@@ -7,6 +9,7 @@ export type Vehicle = {
   createdAt: string; // ISO
   updatedAt: string; // ISO
 
+  kind?: InventoryKind;
   internalNumber?: string;
   licensePlate: string;
   category?: string;
@@ -14,6 +17,8 @@ export type Vehicle = {
   model?: string;
   vin?: string;
   registrationDocumentNumber?: string;
+  accessoryForVehicleRental?: boolean;
+  dailyRentalPriceEur?: number;
 
   status: VehicleStatus;
   notes?: string;

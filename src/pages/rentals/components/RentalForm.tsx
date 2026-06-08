@@ -3,6 +3,7 @@ import type { Rental, RentalAddon, RentalInsurance, RentalParty, RentalPayment, 
 import type { ServiceItem } from "../../../domain/service";
 import { listServices } from "../../../storage/serviceRepo";
 import { listVehicles } from "../../../storage/vehicleRepo";
+import { vehicleDisplayName } from "../../vehicles/vehiclesUi";
 
 function Field(props: { label: string; children: React.ReactNode; hint?: string; className?: string }) {
   return (
@@ -69,6 +70,13 @@ function addonFromService(service: ServiceItem): RentalAddon {
   };
 }
 
+function rentalDays(startAt: string, endAt: string): number {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end.getTime() <= start.getTime()) return 1;
+  return Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86_400_000));
+}
+
 type RentalFormState = {
   startAt: string;
   endAt: string;
@@ -89,7 +97,11 @@ export default function RentalForm(props: {
   onSubmit: (value: Omit<RentalFormState, "vehicle"> & { vehicle: RentalVehicleRef }) => void | Promise<void>;
   submitLabel: string;
 }) {
-  const vehicles = listVehicles();
+  const inventory = listVehicles();
+  const vehicles = inventory.filter((item) => (item.kind ?? "vehicle") === "vehicle");
+  const rentableEquipment = inventory.filter(
+    (item) => (item.kind ?? "vehicle") === "equipment" && item.accessoryForVehicleRental && (item.dailyRentalPriceEur ?? 0) > 0,
+  );
   const services = listServices();
   const [state, setState] = useState<RentalFormState>(() => {
     const initial = props.initial;
@@ -137,6 +149,7 @@ export default function RentalForm(props: {
   const selectedVehicleId = state.vehicle?.vehicleId ?? "";
   const readOnly = props.readOnlyKeys ?? {};
   const addonTotal = state.addons.reduce((sum, item) => sum + (item.unitPriceEur ?? 0) * item.qty, 0);
+  const durationDays = rentalDays(state.startAt, state.endAt);
   const duePreset =
     state.payment.dueKind === "date"
       ? "date"
@@ -292,7 +305,7 @@ export default function RentalForm(props: {
                 const vehicleId = e.target.value;
                 const v = vehicles.find((x) => x.id === vehicleId);
                 if (!v) return setState((s) => ({ ...s, vehicle: null }));
-                const label = `${v.brand ?? ""} ${v.model ?? ""} (${v.licensePlate})`.trim();
+                const label = `${[v.brand, v.model].filter(Boolean).join(" ")} (${v.licensePlate})`.trim();
                 setState((s) => ({
                   ...s,
                   vehicle: {
@@ -314,7 +327,7 @@ export default function RentalForm(props: {
               </option>
               {vehicles.map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.brand} {v.model} • {v.licensePlate}
+                  {vehicleDisplayName(v)}
                 </option>
               ))}
             </select>
@@ -550,6 +563,45 @@ export default function RentalForm(props: {
               </select>
             </Field>
             <div className="flex items-end text-sm font-semibold text-slate-900">Summe: {addonTotal.toFixed(2)} €</div>
+          </div>
+        ) : null}
+        {rentableEquipment.length > 0 ? (
+          <div className="mb-4 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_auto]">
+            <Field label="Gerät als Zubehör">
+              <select
+                value=""
+                onChange={(e) => {
+                  const equipment = rentableEquipment.find((item) => item.id === e.target.value);
+                  if (!equipment) return;
+                  setState((s) => ({
+                    ...s,
+                    addons: [
+                      ...s.addons,
+                      {
+                        id: `equipment-${Date.now()}-${equipment.id}`,
+                        equipmentId: equipment.id,
+                        name: vehicleDisplayName(equipment),
+                        hint: "Zubehör Fahrzeugmiete",
+                        qty: rentalDays(s.startAt, s.endAt),
+                        unitPriceEur: equipment.dailyRentalPriceEur ?? 0,
+                        vatRate: 19,
+                      },
+                    ],
+                  }));
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+              >
+                <option value="" disabled>
+                  Zubehör auswählen…
+                </option>
+                {rentableEquipment.map((equipment) => (
+                  <option key={equipment.id} value={equipment.id}>
+                    {vehicleDisplayName(equipment)} · {(equipment.dailyRentalPriceEur ?? 0).toFixed(2)} €/Tag
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="flex items-end text-sm font-semibold text-slate-900">Mietdauer: {durationDays} Tag(e)</div>
           </div>
         ) : null}
         {state.addons.length === 0 ? (

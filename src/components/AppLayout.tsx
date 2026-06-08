@@ -13,6 +13,7 @@ function getBrandText(): string {
 function getPageTitle(pathname: string, items: NavItem[]): string {
   if (pathname === "/") return "Dashboard";
   const match = items.find((item) => `/${item.to}` === pathname);
+  if (pathname.startsWith("/fahrzeug")) return "Inventar";
   return match?.label ?? "Seite";
 }
 

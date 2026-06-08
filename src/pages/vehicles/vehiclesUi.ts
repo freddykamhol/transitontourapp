@@ -1,4 +1,14 @@
-import type { DamagePosition, DamageType, VehicleStatus } from "../../domain/vehicle";
+import type { DamagePosition, DamageType, InventoryKind, Vehicle, VehicleStatus } from "../../domain/vehicle";
+
+export function inventoryKindLabel(kind: InventoryKind): string {
+  return kind === "equipment" ? "Gerät" : "Fahrzeug";
+}
+
+export function vehicleDisplayName(vehicle: Pick<Vehicle, "kind" | "licensePlate" | "brand" | "model" | "category">): string {
+  const kind = vehicle.kind ?? "vehicle";
+  if (kind === "equipment") return [vehicle.brand, vehicle.model].filter(Boolean).join(" ") || vehicle.category || vehicle.licensePlate || "Gerät";
+  return vehicle.licensePlate || [vehicle.brand, vehicle.model].filter(Boolean).join(" ") || "Fahrzeug";
+}
 
 export function formatStatus(status: VehicleStatus): string {
   switch (status) {

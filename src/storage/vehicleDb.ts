@@ -24,9 +24,24 @@ function isDbV2(value: unknown): value is VehicleDb {
   );
 }
 
+function normalizeDb(db: VehicleDb): VehicleDb {
+  return {
+    ...db,
+    vehicles: db.vehicles.map((vehicle) => ({
+      ...vehicle,
+      kind: vehicle.kind ?? "vehicle",
+      accessoryForVehicleRental: Boolean(vehicle.accessoryForVehicleRental),
+      dailyRentalPriceEur:
+        typeof vehicle.dailyRentalPriceEur === "number" && Number.isFinite(vehicle.dailyRentalPriceEur)
+          ? vehicle.dailyRentalPriceEur
+          : undefined,
+    })),
+  };
+}
+
 export function loadVehicleDb(): VehicleDb {
   const parsedV2 = safeParse(localStorage.getItem(STORAGE_KEY_V2));
-  if (isDbV2(parsedV2)) return parsedV2;
+  if (isDbV2(parsedV2)) return normalizeDb(parsedV2);
 
   const parsedV1 = safeParse(localStorage.getItem(STORAGE_KEY_V1));
   if (
@@ -38,7 +53,7 @@ export function loadVehicleDb(): VehicleDb {
     Array.isArray((parsedV1 as { damages?: unknown }).damages)
   ) {
     const v1 = parsedV1 as { vehicles: VehicleDb["vehicles"]; odometer: VehicleDb["odometer"]; damages: VehicleDb["damages"] };
-    const migrated: VehicleDb = { version: 2, vehicles: v1.vehicles, odometer: v1.odometer, damages: v1.damages, maintenances: [] };
+    const migrated: VehicleDb = normalizeDb({ version: 2, vehicles: v1.vehicles, odometer: v1.odometer, damages: v1.damages, maintenances: [] });
     localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(migrated));
     return migrated;
   }

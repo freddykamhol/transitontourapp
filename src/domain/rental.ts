@@ -35,6 +35,7 @@ export type RentalInsurance = {
 export type RentalAddon = {
   id: string;
   serviceId?: string;
+  equipmentId?: string;
   name: string;
   hint?: string;
   qty: number;

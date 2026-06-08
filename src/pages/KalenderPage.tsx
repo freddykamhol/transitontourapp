@@ -72,14 +72,15 @@ export default function KalenderPage() {
 
   const effectiveSelected = urlSelectedDate ?? selected;
   const effectiveMonth = urlSelectedDate ? startOfMonth(urlSelectedDate) : month;
+  const vehicles = useMemo(() => listVehicles().filter((v) => (v.kind ?? "vehicle") === "vehicle"), []);
 
   const vehicleLabelById = useMemo(() => {
     const map = new Map<string, string>();
-    for (const v of listVehicles()) {
+    for (const v of vehicles) {
       map.set(v.id, [v.licensePlate, v.brand, v.model].filter(Boolean).join(" "));
     }
     return map;
-  }, []);
+  }, [vehicles]);
 
   function daysBetweenInclusive(start: Date, end: Date): Date[] {
     const a = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0);
@@ -125,8 +126,8 @@ export default function KalenderPage() {
   }, [vehicleLabelById]);
 
   const totalActiveVehicles = useMemo(() => {
-    return listVehicles().filter((v) => v.status !== "inaktiv").length;
-  }, []);
+    return vehicles.filter((v) => v.status !== "inaktiv").length;
+  }, [vehicles]);
 
   const daySignals = useMemo(() => {
     const handovers = new Map<string, number>();
@@ -299,7 +300,7 @@ export default function KalenderPage() {
               aria-label="Fahrzeug Filter"
             >
               <option value="">Alle Fahrzeuge</option>
-              {listVehicles().map((v) => (
+              {vehicles.map((v) => (
                 <option key={v.id} value={v.id}>
                   {[v.licensePlate, v.brand, v.model].filter(Boolean).join(" ")}
                 </option>

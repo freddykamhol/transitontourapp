@@ -11,7 +11,7 @@ import {
   updateMaintenance,
   updateVehicle,
 } from "../../storage/vehicleRepo";
-import { damageTypeLabel, formatStatus, positionLabel, statusPillClass } from "./vehiclesUi";
+import { damageTypeLabel, formatStatus, inventoryKindLabel, positionLabel, statusPillClass, vehicleDisplayName } from "./vehiclesUi";
 import DamageSketch from "./components/DamageSketch";
 import { suggestDamagePosition } from "./damagePositionSuggest";
 import { downloadDamagePdf, downloadSketchPng } from "./exportDamageSketch";
@@ -48,9 +48,12 @@ export default function FahrzeugDetailsPage() {
   const [edit, setEdit] = useState<{
     internalNumber: string;
     licensePlate: string;
+    category: string;
     brand: string;
     model: string;
     vin: string;
+    accessoryForVehicleRental: boolean;
+    dailyRentalPriceEur: string;
     status: VehicleStatus;
     notes: string;
   } | null>(
@@ -58,9 +61,12 @@ export default function FahrzeugDetailsPage() {
       ? {
           internalNumber: data.vehicle.internalNumber ?? "",
           licensePlate: data.vehicle.licensePlate,
+          category: data.vehicle.category ?? "",
           brand: data.vehicle.brand ?? "",
           model: data.vehicle.model ?? "",
           vin: data.vehicle.vin ?? "",
+          accessoryForVehicleRental: Boolean(data.vehicle.accessoryForVehicleRental),
+          dailyRentalPriceEur: data.vehicle.dailyRentalPriceEur ? String(data.vehicle.dailyRentalPriceEur) : "",
           status: data.vehicle.status,
           notes: data.vehicle.notes ?? "",
         }
@@ -107,11 +113,11 @@ export default function FahrzeugDetailsPage() {
   if (!vehicleId || !data || !edit) {
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold tracking-tight">Fahrzeug nicht gefunden</h2>
-        <p className="mt-2 text-sm text-slate-600">Dieses Fahrzeug existiert nicht (mehr).</p>
+        <h2 className="text-sm font-semibold tracking-tight">Inventar nicht gefunden</h2>
+        <p className="mt-2 text-sm text-slate-600">Dieser Eintrag existiert nicht (mehr).</p>
         <div className="mt-4">
           <Link to="/fahrzeug" className="text-xs font-semibold text-slate-900 hover:text-slate-700">
-            Zur Fahrzeugliste
+            Zur Inventarliste
           </Link>
         </div>
       </div>
@@ -119,17 +125,23 @@ export default function FahrzeugDetailsPage() {
   }
 
   const currentKm = data.odometer[0]?.km;
+  const kind = data.vehicle.kind ?? "vehicle";
+  const isEquipment = kind === "equipment";
 
   return (
     <div className="grid gap-6">
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold tracking-tight">{data.vehicle.licensePlate}</h2>
+            <h2 className="truncate text-sm font-semibold tracking-tight">{vehicleDisplayName(data.vehicle)}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-2">
+              <Pill text={inventoryKindLabel(kind)} className="bg-slate-100 text-slate-700 ring-1 ring-slate-200" />
               <Pill text={formatStatus(data.vehicle.status)} className={statusPillClass(data.vehicle.status)} />
               <span className="text-xs text-slate-500">{data.vehicle.id}</span>
-              {typeof currentKm === "number" ? <span className="text-xs text-slate-500">{currentKm} km</span> : null}
+              {!isEquipment && typeof currentKm === "number" ? <span className="text-xs text-slate-500">{currentKm} km</span> : null}
+              {isEquipment && data.vehicle.accessoryForVehicleRental ? (
+                <span className="text-xs text-slate-500">{(data.vehicle.dailyRentalPriceEur ?? 0).toFixed(2)} €/Tag</span>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -143,7 +155,7 @@ export default function FahrzeugDetailsPage() {
               type="button"
               className="inline-flex items-center rounded-2xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-rose-500"
               onClick={() => {
-                const ok = confirm("Fahrzeug wirklich löschen? Alle KM- und Schaden-Daten werden entfernt.");
+                const ok = confirm("Inventareintrag wirklich löschen? Alle KM- und Schaden-Daten werden entfernt.");
                 if (!ok) return;
                 deleteVehicle(vehicleId);
                 navigate("/fahrzeug");
@@ -164,17 +176,19 @@ export default function FahrzeugDetailsPage() {
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <Field label="Kennzeichen">
-            <input
-              value={edit.licensePlate}
-              onChange={(e) => {
-                const next = e.target.value.toUpperCase();
-                setEdit((s) => (s ? { ...s, licensePlate: next } : s));
-                updateVehicle(vehicleId, { licensePlate: next });
-              }}
-              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
-            />
-          </Field>
+          {!isEquipment ? (
+            <Field label="Kennzeichen">
+              <input
+                value={edit.licensePlate}
+                onChange={(e) => {
+                  const next = e.target.value.toUpperCase();
+                  setEdit((s) => (s ? { ...s, licensePlate: next } : s));
+                  updateVehicle(vehicleId, { licensePlate: next });
+                }}
+                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
+              />
+            </Field>
+          ) : null}
           <Field label="Interne Nummer" hint="Optional">
             <input
               value={edit.internalNumber}
@@ -186,7 +200,18 @@ export default function FahrzeugDetailsPage() {
               className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
             />
           </Field>
-          <Field label="Marke" hint="Optional">
+          <Field label={isEquipment ? "Geräteart / Kategorie" : "Fahrzeugart / Kategorie"} hint="Optional">
+            <input
+              value={edit.category}
+              onChange={(e) => {
+                const next = e.target.value;
+                setEdit((s) => (s ? { ...s, category: next } : s));
+                updateVehicle(vehicleId, { category: next.trim() || undefined });
+              }}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
+            />
+          </Field>
+          <Field label={isEquipment ? "Hersteller" : "Marke"} hint="Optional">
             <input
               value={edit.brand}
               onChange={(e) => {
@@ -197,7 +222,7 @@ export default function FahrzeugDetailsPage() {
               className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
             />
           </Field>
-          <Field label="Modell" hint="Optional">
+          <Field label={isEquipment ? "Modell / Bezeichnung" : "Modell"} hint="Optional">
             <input
               value={edit.model}
               onChange={(e) => {
@@ -208,17 +233,19 @@ export default function FahrzeugDetailsPage() {
               className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
             />
           </Field>
-          <Field label="FIN / VIN" hint="Optional">
-            <input
-              value={edit.vin}
-              onChange={(e) => {
-                const next = e.target.value;
-                setEdit((s) => (s ? { ...s, vin: next } : s));
-                updateVehicle(vehicleId, { vin: next.trim() || undefined });
-              }}
-              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
-            />
-          </Field>
+          {!isEquipment ? (
+            <Field label="FIN / VIN" hint="Optional">
+              <input
+                value={edit.vin}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setEdit((s) => (s ? { ...s, vin: next } : s));
+                  updateVehicle(vehicleId, { vin: next.trim() || undefined });
+                }}
+                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
+              />
+            </Field>
+          ) : null}
           <Field label="Status">
             <select
               value={edit.status}
@@ -236,6 +263,40 @@ export default function FahrzeugDetailsPage() {
             </select>
           </Field>
           <div className="md:col-span-2">
+            {isEquipment ? (
+              <div className="mb-4 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={edit.accessoryForVehicleRental}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setEdit((s) => (s ? { ...s, accessoryForVehicleRental: next } : s));
+                      updateVehicle(vehicleId, {
+                        accessoryForVehicleRental: next,
+                        dailyRentalPriceEur: next ? Number(edit.dailyRentalPriceEur.replace(",", ".")) || undefined : undefined,
+                      });
+                    }}
+                  />
+                  Zubehör Fahrzeugmiete
+                </label>
+                <Field label="Tagesmietpreis (EUR)" hint="Pflicht für buchbares Zubehör.">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    disabled={!edit.accessoryForVehicleRental}
+                    value={edit.dailyRentalPriceEur}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setEdit((s) => (s ? { ...s, dailyRentalPriceEur: next } : s));
+                      updateVehicle(vehicleId, { dailyRentalPriceEur: Number(next.replace(",", ".")) || undefined });
+                    }}
+                    className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400 disabled:bg-slate-100"
+                  />
+                </Field>
+              </div>
+            ) : null}
             <Field label="Notizen" hint="Optional">
               <textarea
                 value={edit.notes}
