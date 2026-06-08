@@ -5,6 +5,7 @@ export type ServiceItem = {
   unitPriceEur: number;
   vatRate: number;
   active: boolean;
+  appliesTo?: "vehicle" | "equipment" | "both";
 };
 
 export type ServiceDb = {

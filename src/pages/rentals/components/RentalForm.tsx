@@ -170,6 +170,7 @@ export default function RentalForm(props: {
   const selectedVehicleId = state.vehicle?.vehicleId ?? "";
   const primaryInventory = state.rentalKind === "equipment" ? equipment : vehicles;
   const readOnly = props.readOnlyKeys ?? {};
+  const applicableServices = services.filter((service) => (service.appliesTo ?? "both") === "both" || service.appliesTo === state.rentalKind);
   const addonTotal = state.addons.reduce((sum, item) => sum + (item.unitPriceEur ?? 0) * item.qty, 0);
   const durationDays = rentalDays(state.startAt, state.endAt);
   const duePreset =
@@ -599,7 +600,7 @@ export default function RentalForm(props: {
           </div>
         }
       >
-        {services.length > 0 ? (
+        {applicableServices.length > 0 ? (
           <div className="mb-4 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_auto]">
             <Field label="Leistung aus Katalog">
               <select
@@ -614,7 +615,7 @@ export default function RentalForm(props: {
                 <option value="" disabled>
                   Leistung auswählen…
                 </option>
-                {services.map((service) => (
+                {applicableServices.map((service) => (
                   <option key={service.id} value={service.id}>
                     {service.name} · {service.unitPriceEur.toFixed(2)} € · {service.vatRate}% MwSt
                   </option>

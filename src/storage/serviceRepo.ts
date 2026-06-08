@@ -4,10 +4,10 @@ import { createId } from "../lib/id";
 const STORAGE_KEY = "tot.serviceDb.v1";
 
 const defaultServices: ServiceItem[] = [
-  { id: "svc-rent", name: "Miete Fahrzeug", hint: "Vereinbarte Nutzung des Fahrzeugs", unitPriceEur: 0, vatRate: 19, active: true },
-  { id: "svc-cleaning", name: "Endreinigung", hint: "Innen- und Außenreinigung nach Rückgabe", unitPriceEur: 0, vatRate: 19, active: true },
-  { id: "svc-delivery", name: "Zustellung / Abholung", hint: "Kosten für Zustellung oder Abholung", unitPriceEur: 0, vatRate: 19, active: true },
-  { id: "svc-gas", name: "Servicepauschale / Nutzgas", hint: "Bereitstellung und Rückgabe Gasvorrat", unitPriceEur: 0, vatRate: 19, active: true },
+  { id: "svc-rent", name: "Miete Fahrzeug", hint: "Vereinbarte Nutzung des Fahrzeugs", unitPriceEur: 0, vatRate: 19, active: true, appliesTo: "vehicle" },
+  { id: "svc-cleaning", name: "Endreinigung", hint: "Innen- und Außenreinigung nach Rückgabe", unitPriceEur: 0, vatRate: 19, active: true, appliesTo: "vehicle" },
+  { id: "svc-delivery", name: "Zustellung / Abholung", hint: "Kosten für Zustellung oder Abholung", unitPriceEur: 0, vatRate: 19, active: true, appliesTo: "both" },
+  { id: "svc-gas", name: "Servicepauschale / Nutzgas", hint: "Bereitstellung und Rückgabe Gasvorrat", unitPriceEur: 0, vatRate: 19, active: true, appliesTo: "vehicle" },
 ];
 
 function safeParse(raw: string | null): unknown | null {
@@ -27,7 +27,7 @@ function isDb(value: unknown): value is ServiceDb {
 
 function loadDb(): ServiceDb {
   const parsed = safeParse(localStorage.getItem(STORAGE_KEY));
-  if (isDb(parsed)) return parsed;
+  if (isDb(parsed)) return { ...parsed, services: parsed.services.map((service) => ({ ...service, appliesTo: service.appliesTo ?? "both" })) };
   return { version: 1, services: defaultServices };
 }
 
@@ -44,7 +44,7 @@ export function listServices(includeInactive = false): ServiceItem[] {
 
 export function upsertService(input: Omit<ServiceItem, "id"> & { id?: string }): ServiceItem {
   const db = loadDb();
-  const service: ServiceItem = { ...input, id: input.id || createId("svc") };
+  const service: ServiceItem = { ...input, appliesTo: input.appliesTo ?? "both", id: input.id || createId("svc") };
   const idx = db.services.findIndex((item) => item.id === service.id);
   if (idx >= 0) db.services[idx] = service;
   else db.services.push(service);

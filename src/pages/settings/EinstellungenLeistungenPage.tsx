@@ -5,7 +5,13 @@ import { formatEur } from "../rentals/rentalUi";
 
 type FormState = Omit<ServiceItem, "id"> & { id?: string };
 
-const emptyForm: FormState = { name: "", hint: "", unitPriceEur: 0, vatRate: 19, active: true };
+const emptyForm: FormState = { name: "", hint: "", unitPriceEur: 0, vatRate: 19, active: true, appliesTo: "both" };
+
+function appliesToLabel(value: ServiceItem["appliesTo"]): string {
+  if (value === "vehicle") return "Fahrzeug";
+  if (value === "equipment") return "Gerät";
+  return "Beide";
+}
 
 function Field(props: { label: string; children: React.ReactNode; className?: string }) {
   return (
@@ -30,9 +36,20 @@ export default function EinstellungenLeistungenPage() {
         <h3 className="text-sm font-semibold tracking-tight">Leistungskatalog</h3>
         <p className="mt-1 text-xs text-slate-500">Leistungen mit Hinweis, Einzelpreis und MwSt. Diese Positionen können im Vermietungsformular ausgewählt werden.</p>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-6">
+        <div className="mt-5 grid gap-4 md:grid-cols-7">
           <Field label="Leistung" className="md:col-span-2">
             <input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} className={inputClass} />
+          </Field>
+          <Field label="Gültig für">
+            <select
+              value={form.appliesTo ?? "both"}
+              onChange={(e) => setForm((s) => ({ ...s, appliesTo: e.target.value as ServiceItem["appliesTo"] }))}
+              className={inputClass}
+            >
+              <option value="both">Beide</option>
+              <option value="vehicle">Fahrzeug</option>
+              <option value="equipment">Gerät</option>
+            </select>
           </Field>
           <Field label="Einzelpreis €">
             <input
@@ -72,7 +89,7 @@ export default function EinstellungenLeistungenPage() {
               {form.id ? "Aktualisieren" : "Anlegen"}
             </button>
           </div>
-          <Field label="Hinweis" className="md:col-span-6">
+          <Field label="Hinweis" className="md:col-span-7">
             <input value={form.hint} onChange={(e) => setForm((s) => ({ ...s, hint: e.target.value }))} className={inputClass} />
           </Field>
         </div>
@@ -85,6 +102,7 @@ export default function EinstellungenLeistungenPage() {
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3">Leistung</th>
+                <th className="px-4 py-3">Gültig für</th>
                 <th className="px-4 py-3">Hinweis</th>
                 <th className="px-4 py-3 text-right">Preis</th>
                 <th className="px-4 py-3 text-right">MwSt</th>
@@ -95,6 +113,7 @@ export default function EinstellungenLeistungenPage() {
               {services.map((service) => (
                 <tr key={service.id} className={service.active ? "bg-white" : "bg-slate-50 text-slate-400"}>
                   <td className="px-4 py-3 font-semibold text-slate-900">{service.name}</td>
+                  <td className="px-4 py-3 text-slate-700">{appliesToLabel(service.appliesTo)}</td>
                   <td className="px-4 py-3 text-slate-600">{service.hint || "—"}</td>
                   <td className="px-4 py-3 text-right font-semibold">{formatEur(service.unitPriceEur)}</td>
                   <td className="px-4 py-3 text-right">{service.vatRate}%</td>
