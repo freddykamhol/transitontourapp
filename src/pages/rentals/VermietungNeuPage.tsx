@@ -10,7 +10,7 @@ export default function VermietungNeuPage() {
     <div className="grid gap-6">
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold tracking-tight">Vermietung anlegen</h2>
-        <p className="mt-1 text-xs text-slate-500">Grundaufbau: Termine, Mieter, Fahrzeug, Zusatzfahrer, Versicherung, Zusatzleistungen, Zahlung.</p>
+        <p className="mt-1 text-xs text-slate-500">Grundaufbau: Termine, Mieter, Mietgegenstand, Zusatzfahrer/Nutzer, Versicherung, Zusatzleistungen, Zahlung.</p>
       </section>
 
       <RentalForm

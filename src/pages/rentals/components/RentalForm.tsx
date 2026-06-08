@@ -78,6 +78,7 @@ function rentalDays(startAt: string, endAt: string): number {
 }
 
 type RentalFormState = {
+  rentalKind: "vehicle" | "equipment";
   startAt: string;
   endAt: string;
   tenant: RentalParty;
@@ -99,6 +100,7 @@ export default function RentalForm(props: {
 }) {
   const inventory = listVehicles();
   const vehicles = inventory.filter((item) => (item.kind ?? "vehicle") === "vehicle");
+  const equipment = inventory.filter((item) => (item.kind ?? "vehicle") === "equipment");
   const rentableEquipment = inventory.filter(
     (item) => (item.kind ?? "vehicle") === "equipment" && item.accessoryForVehicleRental && (item.dailyRentalPriceEur ?? 0) > 0,
   );
@@ -107,6 +109,7 @@ export default function RentalForm(props: {
     const initial = props.initial;
     if (initial) {
       return {
+        rentalKind: initial.vehicle?.kind ?? "vehicle",
         startAt: initial.startAt,
         endAt: initial.endAt,
         tenant: initial.tenant,
@@ -127,6 +130,7 @@ export default function RentalForm(props: {
     return {
       startAt: start.toISOString(),
       endAt: end.toISOString(),
+      rentalKind: "vehicle",
       tenant: defaultTenant(),
       vehicle: null,
       additionalDrivers: [],
@@ -147,6 +151,7 @@ export default function RentalForm(props: {
   }, [state]);
 
   const selectedVehicleId = state.vehicle?.vehicleId ?? "";
+  const primaryInventory = state.rentalKind === "equipment" ? equipment : vehicles;
   const readOnly = props.readOnlyKeys ?? {};
   const addonTotal = state.addons.reduce((sum, item) => sum + (item.unitPriceEur ?? 0) * item.qty, 0);
   const durationDays = rentalDays(state.startAt, state.endAt);
@@ -295,27 +300,56 @@ export default function RentalForm(props: {
         </div>
       </Section>
 
-      <Section title="Fahrzeug" description="Aus Bestand wählen.">
+      <Section title="Mietgegenstand" description="Fahrzeug oder Gerät aus dem Bestand wählen.">
+        <div className="mb-4 inline-flex rounded-3xl border border-slate-200 bg-slate-50 p-1">
+          <button
+            type="button"
+            disabled={Boolean(readOnly.vehicle)}
+            onClick={() => setState((s) => ({ ...s, rentalKind: "vehicle", vehicle: s.vehicle?.kind === "vehicle" ? s.vehicle : null }))}
+            className={[
+              "rounded-2xl px-4 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
+              state.rentalKind === "vehicle" ? "bg-slate-900 text-white shadow-sm" : "bg-white text-slate-700 hover:bg-slate-50",
+            ].join(" ")}
+          >
+            Fahrzeug
+          </button>
+          <button
+            type="button"
+            disabled={Boolean(readOnly.vehicle)}
+            onClick={() => setState((s) => ({ ...s, rentalKind: "equipment", vehicle: s.vehicle?.kind === "equipment" ? s.vehicle : null }))}
+            className={[
+              "rounded-2xl px-4 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
+              state.rentalKind === "equipment" ? "bg-slate-900 text-white shadow-sm" : "bg-white text-slate-700 hover:bg-slate-50",
+            ].join(" ")}
+          >
+            Gerät
+          </button>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Fahrzeug auswählen">
+          <Field label={state.rentalKind === "equipment" ? "Gerät auswählen" : "Fahrzeug auswählen"}>
             <select
               value={selectedVehicleId}
               disabled={Boolean(readOnly.vehicle)}
               onChange={(e) => {
                 const vehicleId = e.target.value;
-                const v = vehicles.find((x) => x.id === vehicleId);
+                const v = primaryInventory.find((x) => x.id === vehicleId);
                 if (!v) return setState((s) => ({ ...s, vehicle: null }));
-                const label = `${[v.brand, v.model].filter(Boolean).join(" ")} (${v.licensePlate})`.trim();
+                const label =
+                  (v.kind ?? "vehicle") === "equipment"
+                    ? vehicleDisplayName(v)
+                    : `${[v.brand, v.model].filter(Boolean).join(" ")} (${v.licensePlate})`.trim();
                 setState((s) => ({
                   ...s,
                   vehicle: {
                     vehicleId: v.id,
+                    kind: v.kind ?? "vehicle",
                     label,
                     category: v.category,
                     type: [v.brand, v.model].filter(Boolean).join(" "),
-                    licensePlate: v.licensePlate,
-                    vin: v.vin,
-                    registrationDocumentNumber: v.registrationDocumentNumber,
+                    licensePlate: (v.kind ?? "vehicle") === "vehicle" ? v.licensePlate : undefined,
+                    vin: (v.kind ?? "vehicle") === "vehicle" ? v.vin : undefined,
+                    registrationDocumentNumber: (v.kind ?? "vehicle") === "vehicle" ? v.registrationDocumentNumber : undefined,
                   },
                 }));
               }}
@@ -325,7 +359,7 @@ export default function RentalForm(props: {
               <option value="" disabled>
                 Bitte wählen…
               </option>
-              {vehicles.map((v) => (
+              {primaryInventory.map((v) => (
                 <option key={v.id} value={v.id}>
                   {vehicleDisplayName(v)}
                 </option>

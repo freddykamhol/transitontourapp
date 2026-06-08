@@ -18,6 +18,7 @@ export type RentalParty = {
 
 export type RentalVehicleRef = {
   vehicleId: string;
+  kind?: "vehicle" | "equipment";
   label: string; // z.B. "VW T6 (B-AB 1234)"
   category?: string;
   type?: string;

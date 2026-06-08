@@ -46,6 +46,8 @@ export function buildRentalContractPdf(rental: Rental): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const company = getCompanyData();
   const vehicleRecord = rental.vehicle.vehicleId ? getVehicle(rental.vehicle.vehicleId)?.vehicle : null;
+  const rentalKind = rental.vehicle.kind ?? vehicleRecord?.kind ?? "vehicle";
+  const isEquipmentRental = rentalKind === "equipment";
   const vehicle = {
     category: rental.vehicle.category ?? vehicleRecord?.category ?? "",
     type: rental.vehicle.type ?? (compact([vehicleRecord?.brand, vehicleRecord?.model]) || rental.vehicle.label),
@@ -54,7 +56,7 @@ export function buildRentalContractPdf(rental: Rental): jsPDF {
     licensePlate: rental.vehicle.licensePlate ?? vehicleRecord?.licensePlate ?? "",
   };
   const driver2 = rental.additionalDrivers[0] ?? { name: "", email: "" };
-  const addons = rental.addons.length > 0 ? rental.addons : [{ id: "base", name: "Miete Fahrzeug", hint: "Vereinbarte Nutzung", qty: 1, unitPriceEur: rental.payment.totalEur, vatRate: 19 }];
+  const addons = rental.addons.length > 0 ? rental.addons : [{ id: "base", name: isEquipmentRental ? "Miete Gerät" : "Miete Fahrzeug", hint: "Vereinbarte Nutzung", qty: 1, unitPriceEur: rental.payment.totalEur, vatRate: 19 }];
   const totalNet = addons.reduce((sum, addon) => sum + addonNet(addon), 0);
   const totalVat = addons.reduce((sum, addon) => sum + addonVat(addon), 0);
   const totalGross = totalNet + totalVat;
@@ -220,24 +222,39 @@ export function buildRentalContractPdf(rental: Rental): jsPDF {
     ["E-Mail", company.email],
     ["Bemerkungen", company.notes],
   ], page.left, y, half, 73);
-  infoCard("Fahrzeugdaten", [
-    ["Fahrzeugart", vehicle.category],
-    ["Fahrzeugtyp", vehicle.type],
-    ["FIN", vehicle.vin],
-    ["Fahrzeugscheinnummer", vehicle.registrationDocumentNumber],
-    ["Kennzeichen", vehicle.licensePlate],
-  ], page.left + half + 6, y, half, 73);
+  infoCard(
+    isEquipmentRental ? "Gerätedaten" : "Fahrzeugdaten",
+    isEquipmentRental
+      ? [
+          ["Geräteart", vehicle.category],
+          ["Gerätetyp", vehicle.type],
+          ["Interne Referenz", rental.vehicle.label],
+        ]
+      : [
+          ["Fahrzeugart", vehicle.category],
+          ["Fahrzeugtyp", vehicle.type],
+          ["FIN", vehicle.vin],
+          ["Fahrzeugscheinnummer", vehicle.registrationDocumentNumber],
+          ["Kennzeichen", vehicle.licensePlate],
+        ],
+    page.left + half + 6,
+    y,
+    half,
+    73,
+  );
   y += 81;
 
   y = section("Zustand bei Übergabe", y);
-  noteBox("Zustand", "1. Das Fahrzeug wird dem Mieter in technisch einwandfreiem Zustand übergeben. Optische Beeinträchtigungen wie kleine Lackschäden, kleine Dellen, Kratzer oder Parkrempler stellen keine Fahrzeugmängel dar, sofern die Gebrauchsfähigkeit dadurch nicht beeinträchtigt ist.\n2. Das Fahrzeug wird innen und außen gereinigt übergeben.\n3. Der genaue Zustand ergibt sich aus dem gemeinsam zu erstellenden Übergabeprotokoll. Dieses Protokoll ist Bestandteil dieses Mietvertrags.", page.left, y, page.width, 32);
+  noteBox("Zustand", isEquipmentRental
+    ? "1. Das Gerät wird dem Mieter in funktionsfähigem, gereinigtem und vollständigem Zustand mit vereinbartem Zubehör übergeben.\n2. Der Mieter prüft das Gerät bei Übergabe auf erkennbare Mängel, Vollständigkeit und Eignung für den vorgesehenen Zweck.\n3. Der genaue Zustand ergibt sich aus dem Übergabeprotokoll. Dieses Protokoll ist Bestandteil dieses Mietvertrags."
+    : "1. Das Fahrzeug wird dem Mieter in technisch einwandfreiem Zustand übergeben. Optische Beeinträchtigungen wie kleine Lackschäden, kleine Dellen, Kratzer oder Parkrempler stellen keine Fahrzeugmängel dar, sofern die Gebrauchsfähigkeit dadurch nicht beeinträchtigt ist.\n2. Das Fahrzeug wird innen und außen gereinigt übergeben.\n3. Der genaue Zustand ergibt sich aus dem gemeinsam zu erstellenden Übergabeprotokoll. Dieses Protokoll ist Bestandteil dieses Mietvertrags.", page.left, y, page.width, 32);
   y += 40;
 
-  y = section("Mieter und berechtigte Fahrer", y);
+  y = section(isEquipmentRental ? "Mieter und berechtigte Nutzer" : "Mieter und berechtigte Fahrer", y);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(71, 85, 105);
-  doc.text("Nur die nachstehend genannten Mieter/Fahrer sind zum Führen des Fahrzeugs berechtigt.", page.left, y);
+  doc.text(isEquipmentRental ? "Nur die nachstehend genannten Mieter/Nutzer sind zur Nutzung des Geräts berechtigt." : "Nur die nachstehend genannten Mieter/Fahrer sind zum Führen des Fahrzeugs berechtigt.", page.left, y);
   y += 5;
   const driverFields: Array<[string, (party: RentalParty) => string]> = [
     ["Name, Vorname", (party) => party.name],
@@ -247,8 +264,8 @@ export function buildRentalContractPdf(rental: Rental): jsPDF {
     ["Personalausweisnummer", (party) => safeText(party.identityCardNumber)],
     ["Führerscheinnummer", (party) => safeText(party.driverLicenseNumber)],
   ];
-  infoCard("1. Mieter / Fahrer", driverFields.map(([label, getter]) => [label, getter(rental.tenant)]), page.left, y, half, 65);
-  infoCard("2. Mieter / Fahrer", driverFields.map(([label, getter]) => [label, getter(driver2)]), page.left + half + 6, y, half, 65);
+  infoCard(isEquipmentRental ? "1. Mieter / Nutzer" : "1. Mieter / Fahrer", driverFields.map(([label, getter]) => [label, getter(rental.tenant)]), page.left, y, half, 65);
+  infoCard(isEquipmentRental ? "2. Mieter / Nutzer" : "2. Mieter / Fahrer", driverFields.map(([label, getter]) => [label, getter(driver2)]), page.left + half + 6, y, half, 65);
 
   doc.addPage();
   header(2);
@@ -408,7 +425,7 @@ export function buildRentalContractPdf(rental: Rental): jsPDF {
     }
   }
 
-  const termsText = `Mehrere Mieter bilden eine Mietergemeinschaft. Jeder Mieter hat identische Rechte und Pflichten.
+  const vehicleTermsText = `Mehrere Mieter bilden eine Mietergemeinschaft. Jeder Mieter hat identische Rechte und Pflichten.
 1. Zustande kommen des verbindlichen Mietvertrages:
 1.1. Absprachen oder Erklärungen, die nur mündlich, ohne schriftliche Bestätigung, per E-Mail oder SMS erfolgt sind, sind in jedem Fall ohne rechtliche Wirkung. Der Abschluss eines Mietvertrages über das Fahrzeug kann nur schriftlich, in der Regel durch beiderseitige Unterschrift dieses Vertrages erfolgen.
 1.2. Der Mietvertrag kommt zwischen den Vertragsparteien zustande. Eine Übertragung oder Abtretung der Rechte aus dem Mietvertrag durch den Mieter auf andere dritte Personen ist nur mit ausdrücklicher schriftlicher vorheriger Zustimmung des Vermieters möglich.
@@ -475,7 +492,44 @@ export function buildRentalContractPdf(rental: Rental): jsPDF {
 11.4. Wenn und soweit eine der Bestimmungen dieses Vertrages gegen eine zwingende gesetzliche Vorschrift verstößt, tritt an ihre Stelle die entsprechende gesetzliche Regelung.
 Wir haben die allgemeinen Mietbedingungen zur Kenntnis genommen.`;
 
-  addTermsDocument(termsText);
+  const equipmentTermsText = `Mehrere Mieter bilden eine Mietergemeinschaft. Jeder Mieter hat identische Rechte und Pflichten.
+1. Zustandekommen des Mietvertrages:
+1.1. Der Mietvertrag über das im Vertrag bezeichnete Gerät, Zubehör und ggf. Verbrauchsmaterial kommt durch Unterzeichnung, digitale Signatur oder tatsächliche Übernahme des Mietgegenstandes zustande.
+1.2. Abweichende Nebenabreden bedürfen der Textform. Der Mieter ist nicht berechtigt, Rechte aus diesem Vertrag ohne vorherige Zustimmung des Vermieters auf Dritte zu übertragen.
+1.3. Das Gerät bleibt Eigentum des Vermieters. Verkauf, Verpfändung, Sicherungsübereignung, Untervermietung oder Weitergabe an Dritte sind ohne ausdrückliche Zustimmung des Vermieters untersagt.
+2. Mietzeit, Rückgabe und Abrechnung:
+2.1. Die Mietzeit beginnt mit Übergabe oder Bereitstellung des Geräts und endet mit vollständiger Rückgabe beim Vermieter, sofern nicht schriftlich etwas anderes vereinbart wurde.
+2.2. Eine verspätete Rückgabe berechtigt den Vermieter, die vereinbarte Miete für die Dauer der Vorenthaltung weiter zu berechnen. Weitergehende Schäden bleiben vorbehalten.
+2.3. Zubehör, Akkus, Ladegeräte, Schlüssel, Anleitungen, Transportboxen und sonstige mitvermietete Teile sind vollständig und in ordnungsgemäßem Zustand zurückzugeben.
+3. Übergabe, Prüfung und Mängelanzeige:
+3.1. Der Mieter prüft das Gerät bei Übergabe auf offensichtliche Mängel, Vollständigkeit und Eignung für den vorgesehenen Einsatz.
+3.2. Offensichtliche Mängel, Fehlteile oder Transportschäden sind unverzüglich vor Inbetriebnahme anzuzeigen. Unterbleibt die Anzeige, gilt der Mietgegenstand als äußerlich ordnungsgemäß übernommen, soweit der Mangel erkennbar war.
+3.3. Das Übergabeprotokoll, Fotos und die Schadensliste sind Bestandteil des Mietvertrages.
+4. Bestimmungsgemäße Nutzung und Sicherheit:
+4.1. Das Gerät darf nur bestimmungsgemäß, sorgfältig und entsprechend Bedienungsanleitung, Sicherheitsvorschriften und Herstellerhinweisen verwendet werden.
+4.2. Der Mieter stellt sicher, dass nur geeignete und eingewiesene Personen das Gerät nutzen. Erforderliche Schutzkleidung, Genehmigungen, Prüfungen oder Befähigungen sind Sache des Mieters.
+4.3. Einsatz unter gefährlichen, feuchten, explosionsgefährdeten, überlastenden oder sonst ungeeigneten Bedingungen ist untersagt, soweit das Gerät hierfür nicht ausdrücklich freigegeben ist.
+5. Pflege, Reinigung und Betriebsstoffe:
+5.1. Der Mieter hält das Gerät während der Mietzeit in ordnungsgemäßem Zustand, schützt es vor Diebstahl, Witterung, unsachgemäßem Zugriff und Überlastung.
+5.2. Verbrauchsstoffe, Betriebsstoffe, Verschleißteile und fachgerechte Zwischenreinigung trägt der Mieter, sofern nicht ausdrücklich anders vereinbart.
+5.3. Das Gerät ist gereinigt zurückzugeben. Erforderliche Reinigungs-, Trocknungs-, Entsorgungs- oder Wiederherstellungskosten kann der Vermieter berechnen.
+6. Schäden, Verlust und Diebstahl:
+6.1. Schäden, Funktionsstörungen, Verlust oder Diebstahl sind dem Vermieter unverzüglich mitzuteilen. Bei Diebstahl oder sonstigem strafbaren Verhalten ist zusätzlich unverzüglich Anzeige bei der Polizei zu erstatten.
+6.2. Der Mieter haftet für Schäden, Verlust, Fehlteile und Folgekosten, soweit diese durch unsachgemäße Nutzung, Pflichtverletzung oder nicht ordnungsgemäße Rückgabe verursacht wurden.
+6.3. Reparaturen dürfen nur nach vorheriger Zustimmung des Vermieters erfolgen. Eigenmächtige Reparaturen, Umbauten oder technische Veränderungen sind untersagt.
+7. Haftung des Vermieters und Verfügbarkeit:
+7.1. Der Vermieter haftet für Vorsatz und grobe Fahrlässigkeit sowie nach den gesetzlichen Vorschriften bei Verletzung von Leben, Körper oder Gesundheit.
+7.2. Für mittelbare Schäden, Produktionsausfall, entgangenen Gewinn oder ungeeignete Einsatzplanung haftet der Vermieter nur, soweit gesetzlich zwingend vorgeschrieben.
+7.3. Wird das Gerät vor Mietbeginn ohne Verschulden des Vermieters nicht verfügbar, kann der Vermieter ein gleichwertiges Ersatzgerät anbieten oder vom Vertrag zurücktreten. Bereits gezahlte Beträge werden dann erstattet.
+8. Rückgabezustand und Abnahme:
+8.1. Der Vermieter prüft das Gerät nach Rückgabe. Später erkennbare verdeckte Schäden können nachgemeldet werden, wenn sie plausibel der Mietzeit zuzuordnen sind.
+8.2. Fehlendes Zubehör, fehlende Akkus/Ladegeräte, beschädigte Transportbehälter oder fehlende Anleitungen können zum Wiederbeschaffungswert berechnet werden.
+9. Rechtswahl, Gerichtsstand, Sonstiges:
+9.1. Es gilt deutsches Recht.
+9.2. Sollte eine Bestimmung unwirksam sein, bleibt die Wirksamkeit der übrigen Regelungen unberührt; an ihre Stelle tritt die gesetzliche Regelung.
+Wir haben die allgemeinen Mietbedingungen für Geräte zur Kenntnis genommen.`;
+
+  addTermsDocument(isEquipmentRental ? equipmentTermsText : vehicleTermsText);
   return doc;
 }
 
