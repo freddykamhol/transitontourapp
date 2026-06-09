@@ -749,7 +749,7 @@ export async function buildDamageListPdf(rental: Rental): Promise<jsPDF> {
           );
         })
         .map((marker) => ({ x: Math.max(0, Math.min(1, marker.x)), y: Math.max(0, Math.min(1, marker.y)) }));
-      const renderedInside = await renderSketchWithMarkers({ imageSrc: "/sketch/innen.png", markers: insideMarkers, width: 1200 });
+      const renderedInside = await renderSketchWithMarkers({ imageSrc: "/sketch/innen2.png", markers: insideMarkers, width: 1200 });
       doc.addPage();
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);

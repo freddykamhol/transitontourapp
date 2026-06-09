@@ -650,19 +650,34 @@ export default function FahrzeugDetailsPage() {
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {!isEquipment ? (
-            <button
-              type="button"
-              className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-              onClick={async () => {
-                await downloadSketchPng({
-                  filename: `skizze_aussen_${data.vehicle.licensePlate.replaceAll(" ", "_")}.png`,
-                  imageSrc: `${import.meta.env.BASE_URL}sketch/vehicle-top.png`,
-                  damages: data.damages.filter((damage) => (damage.surface ?? "outside") === "outside"),
-                });
-              }}
-            >
-              Außen-Skizze (PNG)
-            </button>
+            <>
+              <button
+                type="button"
+                className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                onClick={async () => {
+                  await downloadSketchPng({
+                    filename: `skizze_aussen_${data.vehicle.licensePlate.replaceAll(" ", "_")}.png`,
+                    imageSrc: `${import.meta.env.BASE_URL}sketch/vehicle-top.png`,
+                    damages: data.damages.filter((damage) => (damage.surface ?? "outside") === "outside"),
+                  });
+                }}
+              >
+                Außen-Skizze (PNG)
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                onClick={async () => {
+                  await downloadSketchPng({
+                    filename: `skizze_innen_${data.vehicle.licensePlate.replaceAll(" ", "_")}.png`,
+                    imageSrc: `${import.meta.env.BASE_URL}sketch/innen2.png`,
+                    damages: data.damages.filter((damage) => damage.surface === "inside"),
+                  });
+                }}
+              >
+                Innen-Skizze (PNG)
+              </button>
+            </>
           ) : null}
           <button
             type="button"
@@ -671,7 +686,7 @@ export default function FahrzeugDetailsPage() {
               await downloadDamagePdf({
                 filename: `schadenuebersicht_${data.vehicle.licensePlate.replaceAll(" ", "_")}.pdf`,
                 imageSrc: `${import.meta.env.BASE_URL}sketch/vehicle-top.png`,
-                interiorImageSrc: `${import.meta.env.BASE_URL}sketch/innen.png`,
+                interiorImageSrc: `${import.meta.env.BASE_URL}sketch/innen2.png`,
                 vehicleLabel: vehicleDisplayName(data.vehicle),
                 damages: data.damages,
                 kind,
@@ -944,7 +959,7 @@ export default function FahrzeugDetailsPage() {
               <div className="grid gap-2">
                 <div className="text-xs font-semibold text-slate-600">{damageForm.surface === "inside" ? "Innen-Skizze" : "Außen-Skizze"}</div>
                 <DamageSketch
-                  imageSrc={`${import.meta.env.BASE_URL}sketch/${damageForm.surface === "inside" ? "innen.png" : "vehicle-top.png"}`}
+                  imageSrc={`${import.meta.env.BASE_URL}sketch/${damageForm.surface === "inside" ? "innen2.png" : "vehicle-top.png"}`}
                   marker={damageForm.marker}
                   onMarkerChange={(marker) =>
                     setDamageForm((s) => {
