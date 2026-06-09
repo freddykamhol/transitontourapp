@@ -1,4 +1,4 @@
-import type { DamagePosition, DamageType, InventoryKind, Vehicle, VehicleStatus } from "../../domain/vehicle";
+import type { DamageInteriorLocation, DamagePosition, DamageReport, DamageType, InventoryKind, Vehicle, VehicleStatus } from "../../domain/vehicle";
 
 export function inventoryKindLabel(kind: InventoryKind): string {
   return kind === "equipment" ? "Gerät" : "Fahrzeug";
@@ -65,6 +65,34 @@ export function positionLabel(position: DamagePosition): string {
     case "unknown":
       return "Unbekannt";
   }
+}
+
+export function interiorLocationLabel(location: DamageInteriorLocation): string {
+  switch (location) {
+    case "driver":
+      return "Fahrer";
+    case "passenger":
+      return "Beifahrer";
+    case "rear_bench":
+      return "Rückbank";
+    case "trunk":
+      return "Kofferraum";
+    case "conversion":
+      return "Ausbau";
+    case "other":
+      return "Andere";
+  }
+}
+
+export function damageLocationLabel(damage: DamageReport): string {
+  if ((damage.surface ?? "outside") === "inside") {
+    const base = damage.interiorLocation === "other" ? damage.customLocation : damage.interiorLocation ? interiorLocationLabel(damage.interiorLocation) : "Innen";
+    return [base || "Andere", damage.locationNote].filter(Boolean).join(" · ");
+  }
+  if ((damage.surface ?? "outside") === "none") {
+    return [damage.customLocation || "Lokalisierung", damage.locationNote].filter(Boolean).join(" · ");
+  }
+  return [positionLabel(damage.position ?? "unknown"), damage.locationNote].filter(Boolean).join(" · ");
 }
 
 export function damageTypeLabel(type: DamageType): string {

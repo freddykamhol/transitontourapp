@@ -63,6 +63,16 @@ export type DamagePosition =
   | "bottom_right"
   | "unknown";
 
+export type DamageSurface = "outside" | "inside" | "none";
+
+export type DamageInteriorLocation =
+  | "driver"
+  | "passenger"
+  | "rear_bench"
+  | "trunk"
+  | "conversion"
+  | "other";
+
 export type DamageType =
   | "kratzer"
   | "delle"
@@ -85,6 +95,10 @@ export type DamageReport = {
   updatedAt: string; // ISO
 
   position: DamagePosition;
+  surface?: DamageSurface;
+  interiorLocation?: DamageInteriorLocation;
+  customLocation?: string;
+  locationNote?: string;
   type: DamageType;
   severity: "leicht" | "mittel" | "stark";
   details?: string;

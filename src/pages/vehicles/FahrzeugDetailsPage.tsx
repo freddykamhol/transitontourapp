@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { DamagePosition, DamageType, SketchMarker, VehicleStatus } from "../../domain/vehicle";
+import type { DamageInteriorLocation, DamagePosition, DamageSurface, DamageType, SketchMarker, VehicleStatus } from "../../domain/vehicle";
 import {
   addDamage,
   addMaintenance,
@@ -11,7 +11,7 @@ import {
   updateMaintenance,
   updateVehicle,
 } from "../../storage/vehicleRepo";
-import { damageTypeLabel, formatStatus, inventoryKindLabel, positionLabel, statusPillClass, vehicleDisplayName } from "./vehiclesUi";
+import { damageLocationLabel, damageTypeLabel, formatStatus, interiorLocationLabel, inventoryKindLabel, positionLabel, statusPillClass, vehicleDisplayName } from "./vehiclesUi";
 import DamageSketch from "./components/DamageSketch";
 import { suggestDamagePosition } from "./damagePositionSuggest";
 import { downloadDamagePdf, downloadSketchPng } from "./exportDamageSketch";
@@ -31,7 +31,11 @@ function Field(props: { label: string; children: React.ReactNode; hint?: string 
 }
 
 type DamageForm = {
+  surface: DamageSurface;
   position: DamagePosition;
+  interiorLocation: DamageInteriorLocation;
+  customLocation: string;
+  locationNote: string;
   positionMode: "auto" | "manual";
   type: DamageType;
   severity: "leicht" | "mittel" | "stark";
@@ -87,7 +91,11 @@ export default function FahrzeugDetailsPage() {
   });
 
   const [damageForm, setDamageForm] = useState<DamageForm>({
+    surface: "outside",
     position: "unknown",
+    interiorLocation: "driver",
+    customLocation: "",
+    locationNote: "",
     positionMode: "auto",
     type: "kratzer",
     severity: "leicht",
@@ -636,22 +644,26 @@ export default function FahrzeugDetailsPage() {
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="text-sm font-semibold tracking-tight">Schäden</h3>
-        <p className="mt-1 text-xs text-slate-500">Schaden anlegen (Position, Art, Details) inkl. Marker auf Skizze.</p>
+        <p className="mt-1 text-xs text-slate-500">
+          {isEquipment ? "Schaden anlegen mit freier Lokalisierung, Art, Details und Fotos." : "Schaden anlegen mit Außen-/Innen-Skizze, Lokalisierung, Art, Details und Fotos."}
+        </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-            onClick={async () => {
-              await downloadSketchPng({
-                filename: `skizze_${data.vehicle.licensePlate.replaceAll(" ", "_")}.png`,
-                imageSrc: `${import.meta.env.BASE_URL}sketch/vehicle-top.png`,
-                damages: data.damages,
-              });
-            }}
-          >
-            Skizze (PNG) herunterladen
-          </button>
+          {!isEquipment ? (
+            <button
+              type="button"
+              className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+              onClick={async () => {
+                await downloadSketchPng({
+                  filename: `skizze_aussen_${data.vehicle.licensePlate.replaceAll(" ", "_")}.png`,
+                  imageSrc: `${import.meta.env.BASE_URL}sketch/vehicle-top.png`,
+                  damages: data.damages.filter((damage) => (damage.surface ?? "outside") === "outside"),
+                });
+              }}
+            >
+              Außen-Skizze (PNG)
+            </button>
+          ) : null}
           <button
             type="button"
             className="inline-flex items-center rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-800"
@@ -659,22 +671,24 @@ export default function FahrzeugDetailsPage() {
               await downloadDamagePdf({
                 filename: `schadenuebersicht_${data.vehicle.licensePlate.replaceAll(" ", "_")}.pdf`,
                 imageSrc: `${import.meta.env.BASE_URL}sketch/vehicle-top.png`,
-                vehicleLabel: [data.vehicle.licensePlate, data.vehicle.brand, data.vehicle.model].filter(Boolean).join(" "),
+                interiorImageSrc: `${import.meta.env.BASE_URL}sketch/innen.png`,
+                vehicleLabel: vehicleDisplayName(data.vehicle),
                 damages: data.damages,
+                kind,
               });
             }}
           >
             Schadenübersicht (PDF) herunterladen
           </button>
           <div className="text-[11px] text-slate-500">
-            PNG: nur Skizze + Marker. PDF: Skizze + Liste (ohne Fotos, mit Details).
+            {isEquipment ? "PDF: Liste ohne Skizze." : "PNG: Außen-Skizze + Marker. PDF: Liste plus eigene Skizzenseiten."}
           </div>
           <button
             type="button"
             className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
             onClick={() => {
               const payload = {
-                vehicleLabel: [data.vehicle.licensePlate, data.vehicle.brand, data.vehicle.model].filter(Boolean).join(" "),
+                vehicleLabel: vehicleDisplayName(data.vehicle),
                 damages: data.damages,
               };
               const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -698,7 +712,11 @@ export default function FahrzeugDetailsPage() {
             e.preventDefault();
             addDamage({
               vehicleId,
+              surface: isEquipment ? "none" : damageForm.surface,
               position: damageForm.position,
+              interiorLocation: !isEquipment && damageForm.surface === "inside" ? damageForm.interiorLocation : undefined,
+              customLocation: (isEquipment || damageForm.interiorLocation === "other") ? damageForm.customLocation.trim() || undefined : undefined,
+              locationNote: damageForm.locationNote.trim() || undefined,
               type: damageForm.type,
               severity: damageForm.severity,
               details: damageForm.details.trim() || undefined,
@@ -706,7 +724,11 @@ export default function FahrzeugDetailsPage() {
               photos: damageForm.photos.length > 0 ? damageForm.photos : undefined,
             });
             setDamageForm({
+              surface: isEquipment ? "none" : "outside",
               position: "unknown",
+              interiorLocation: "driver",
+              customLocation: "",
+              locationNote: "",
               positionMode: "auto",
               type: "kratzer",
               severity: "leicht",
@@ -718,26 +740,104 @@ export default function FahrzeugDetailsPage() {
         >
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="grid gap-4">
-              <Field label="Position">
-                <select
-                  value={damageForm.position}
-                  onChange={(e) =>
-                    setDamageForm((s) => ({
-                      ...s,
-                      position: e.target.value as DamagePosition,
-                      positionMode: "manual",
-                    }))
-                  }
-                  className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
-                >
-                  {positionSuggestion.allowed.map((pos) => (
-                    <option key={pos} value={pos}>
-                      {positionLabel(pos)}
-                      {pos === positionSuggestion.suggested ? " (Vorschlag)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              {!isEquipment ? (
+                <div className="grid gap-2">
+                  <div className="text-xs font-semibold text-slate-600">Bereich</div>
+                  <div className="inline-flex w-fit rounded-3xl border border-slate-200 bg-white p-1">
+                    {[
+                      ["outside", "Außen"],
+                      ["inside", "Innen"],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() =>
+                          setDamageForm((s) => ({
+                            ...s,
+                            surface: value as DamageSurface,
+                            positionMode: value === "outside" ? s.positionMode : "manual",
+                          }))
+                        }
+                        className={[
+                          "rounded-2xl px-4 py-2 text-xs font-semibold transition",
+                          damageForm.surface === value ? "bg-slate-900 text-white shadow-sm" : "text-slate-700 hover:bg-slate-50",
+                        ].join(" ")}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {isEquipment ? (
+                <Field label="Lokalisierung">
+                  <input
+                    value={damageForm.customLocation}
+                    onChange={(e) => setDamageForm((s) => ({ ...s, customLocation: e.target.value }))}
+                    className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                    placeholder="z.B. Griff, Gehäuse links, Kabel, Display…"
+                  />
+                </Field>
+              ) : damageForm.surface === "inside" ? (
+                <>
+                  <Field label="Lokalisierung innen">
+                    <select
+                      value={damageForm.interiorLocation}
+                      onChange={(e) => setDamageForm((s) => ({ ...s, interiorLocation: e.target.value as DamageInteriorLocation }))}
+                      className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                    >
+                      {(["driver", "passenger", "rear_bench", "trunk", "conversion", "other"] as DamageInteriorLocation[]).map((loc) => (
+                        <option key={loc} value={loc}>
+                          {interiorLocationLabel(loc)}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  {damageForm.interiorLocation === "other" ? (
+                    <Field label="Andere Lokalisierung">
+                      <input
+                        value={damageForm.customLocation}
+                        onChange={(e) => setDamageForm((s) => ({ ...s, customLocation: e.target.value }))}
+                        className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                        placeholder="Lokalisierung definieren…"
+                      />
+                    </Field>
+                  ) : null}
+                </>
+              ) : (
+                <Field label="Position außen">
+                  <select
+                    value={damageForm.position}
+                    onChange={(e) =>
+                      setDamageForm((s) => ({
+                        ...s,
+                        position: e.target.value as DamagePosition,
+                        positionMode: "manual",
+                      }))
+                    }
+                    className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                  >
+                    {positionSuggestion.allowed.map((pos) => (
+                      <option key={pos} value={pos}>
+                        {positionLabel(pos)}
+                        {pos === positionSuggestion.suggested ? " (Vorschlag)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+
+              {!isEquipment ? (
+                <Field label="Bemerkung zur Lokalisation" hint="Optional">
+                  <input
+                    value={damageForm.locationNote}
+                    onChange={(e) => setDamageForm((s) => ({ ...s, locationNote: e.target.value }))}
+                    className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                    placeholder="z.B. oben links am Fenster, nahe Türgriff…"
+                  />
+                </Field>
+              ) : null}
 
               <Field label="Schadensart">
                 <select
@@ -840,24 +940,27 @@ export default function FahrzeugDetailsPage() {
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <div className="text-xs font-semibold text-slate-600">Skizze</div>
-              <DamageSketch
-                imageSrc={`${import.meta.env.BASE_URL}sketch/vehicle-top.png`}
-                marker={damageForm.marker}
-                onMarkerChange={(marker) =>
-                  setDamageForm((s) => {
-                    const next = { ...s, marker };
-                    const suggestion = suggestDamagePosition(marker);
-                    // Solange nicht manuell überschrieben, folgt Position dem Marker
-                    if (next.positionMode === "auto") next.position = suggestion.suggested;
-                    if (!marker) next.positionMode = "auto";
-                    return next;
-                  })
-                }
-              />
-              <div className="text-[11px] text-slate-500">Skizzenbild: `public/sketch/vehicle-top.png`</div>
-            </div>
+            {!isEquipment ? (
+              <div className="grid gap-2">
+                <div className="text-xs font-semibold text-slate-600">{damageForm.surface === "inside" ? "Innen-Skizze" : "Außen-Skizze"}</div>
+                <DamageSketch
+                  imageSrc={`${import.meta.env.BASE_URL}sketch/${damageForm.surface === "inside" ? "innen.png" : "vehicle-top.png"}`}
+                  marker={damageForm.marker}
+                  onMarkerChange={(marker) =>
+                    setDamageForm((s) => {
+                      const next = { ...s, marker };
+                      if (s.surface === "outside") {
+                        const suggestion = suggestDamagePosition(marker);
+                        if (next.positionMode === "auto") next.position = suggestion.suggested;
+                        if (!marker) next.positionMode = "auto";
+                      }
+                      return next;
+                    })
+                  }
+                />
+                <div className="text-[11px] text-slate-500">Punkt kann für Innen und Außen gesetzt werden.</div>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex justify-end">
@@ -881,10 +984,10 @@ export default function FahrzeugDetailsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-slate-900">
-                      {damageTypeLabel(d.type ?? "sonstiges")} • {positionLabel(d.position ?? "unknown")}
+                      {damageTypeLabel(d.type ?? "sonstiges")} • {damageLocationLabel(d)}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {d.severity} • {new Date(d.updatedAt).toLocaleString()}
+                      {(d.surface ?? "outside") === "inside" ? "Innen" : (d.surface ?? "outside") === "none" ? "Gerät" : "Außen"} • {d.severity} • {new Date(d.updatedAt).toLocaleString()}
                     </div>
                     {d.details ? <div className="mt-2 text-sm text-slate-700">{d.details}</div> : null}
                   </div>

@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
-import type { DamageReport } from "../../domain/vehicle";
-import { damageTypeLabel, positionLabel } from "./vehiclesUi";
+import type { DamageReport, InventoryKind } from "../../domain/vehicle";
+import { damageLocationLabel, damageTypeLabel } from "./vehiclesUi";
 
 type Marker = { x: number; y: number };
 
@@ -110,21 +110,21 @@ function fmtDate(iso: string | null | undefined): string {
 }
 
 function groupDamages(damages: DamageReport[]) {
-  const top: DamageReport[] = [];
-  const bottom: DamageReport[] = [];
+  const outside: DamageReport[] = [];
+  const inside: DamageReport[] = [];
   const none: DamageReport[] = [];
 
   for (const d of damages) {
-    const m = ensureMarker(d.marker);
-    if (!m) {
-      none.push(d);
-    } else if (m.y < 0.5) {
-      top.push(d);
+    const surface = d.surface ?? "outside";
+    if (surface === "inside") {
+      inside.push(d);
+    } else if (surface === "outside") {
+      outside.push(d);
     } else {
-      bottom.push(d);
+      none.push(d);
     }
   }
-  return { top, bottom, none };
+  return { outside, inside, none };
 }
 
 function addBulletLine(doc: jsPDF, text: string, x: number, y: number, maxWidth: number, lineHeight: number): number {
@@ -147,12 +147,11 @@ function addBulletLine(doc: jsPDF, text: string, x: number, y: number, maxWidth:
 export async function downloadDamagePdf(params: {
   filename: string;
   imageSrc: string;
+  interiorImageSrc?: string;
   vehicleLabel: string;
   damages: DamageReport[];
+  kind?: InventoryKind;
 }) {
-  const markers = params.damages.map((d) => ensureMarker(d.marker)).filter(Boolean) as Marker[];
-  const rendered = await renderSketchWithMarkers({ imageSrc: params.imageSrc, markers, width: 1200 });
-
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -167,23 +166,16 @@ export async function downloadDamagePdf(params: {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(`Fahrzeug: ${params.vehicleLabel}`, margin, margin + 18);
+  doc.text(`${params.kind === "equipment" ? "Gerät" : "Fahrzeug"}: ${params.vehicleLabel}`, margin, margin + 18);
   doc.text(`Export: ${new Date().toLocaleString()}`, margin, margin + 34);
 
-  // Sketch image
-  const imageMaxHeight = 260;
-  const sketchW = contentWidth;
-  const sketchH = Math.min(imageMaxHeight, Math.round((rendered.height / rendered.width) * sketchW));
-  const sketchY = margin + 52;
-  doc.addImage(rendered.dataUrl, "PNG", margin, sketchY, sketchW, sketchH);
+  let y = margin + 62;
 
-  let y = sketchY + sketchH + 18;
-
-  const { top, bottom, none } = groupDamages(params.damages);
+  const { outside, inside, none } = groupDamages(params.damages);
   const sections: Array<{ title: string; items: DamageReport[] }> = [
-    { title: "Oben (linke Fahrzeugseite)", items: top },
-    { title: "Unten (rechte Fahrzeugseite)", items: bottom },
-    { title: "Ohne Marker", items: none },
+    { title: "Außen", items: outside },
+    { title: "Innen", items: inside },
+    { title: params.kind === "equipment" ? "Gerät" : "Ohne Skizze", items: none },
   ];
 
   doc.setFontSize(11);
@@ -209,7 +201,7 @@ export async function downloadDamagePdf(params: {
     doc.setFont("helvetica", "normal");
 
     for (const d of section.items) {
-      const title = `${damageTypeLabel(d.type ?? "sonstiges")} • ${positionLabel(d.position ?? "unknown")} • ${d.severity}`;
+      const title = `${damageTypeLabel(d.type ?? "sonstiges")} • ${damageLocationLabel(d)} • ${d.severity}`;
       const meta = fmtDate(d.createdAt) ? `Datum: ${fmtDate(d.createdAt)}` : "";
       const details = d.details?.trim() ? `Details: ${d.details.trim()}` : "";
 
@@ -223,6 +215,26 @@ export async function downloadDamagePdf(params: {
       y = addBulletLine(doc, block, margin, y, contentWidth, lineHeight);
       y += 4;
     }
+  }
+
+  async function addSketchPage(title: string, imageSrc: string, damages: DamageReport[]) {
+    const markers = damages.map((d) => ensureMarker(d.marker)).filter(Boolean) as Marker[];
+    const rendered = await renderSketchWithMarkers({ imageSrc, markers, width: 1200 });
+    doc.addPage();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text(title, margin, margin);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`${params.kind === "equipment" ? "Gerät" : "Fahrzeug"}: ${params.vehicleLabel}`, margin, margin + 18);
+    const sketchW = contentWidth;
+    const sketchH = Math.min(pageHeight - margin * 2 - 45, Math.round((rendered.height / rendered.width) * sketchW));
+    doc.addImage(rendered.dataUrl, "PNG", margin, margin + 42, sketchW, sketchH);
+  }
+
+  if (params.kind !== "equipment") {
+    if (outside.length > 0) await addSketchPage("Skizze außen", params.imageSrc, outside);
+    if (inside.length > 0 && params.interiorImageSrc) await addSketchPage("Skizze innen", params.interiorImageSrc, inside);
   }
 
   const blob = doc.output("blob");

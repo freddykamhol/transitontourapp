@@ -3,7 +3,7 @@ import type { Rental, RentalAddon, RentalDigitalSignature, RentalParty } from ".
 import { getCompanyData } from "../../storage/companyRepo";
 import { getVehicle } from "../../storage/vehicleRepo";
 import { renderSketchWithMarkers } from "../vehicles/exportDamageSketch";
-import { damageTypeLabel, positionLabel } from "../vehicles/vehiclesUi";
+import { damageLocationLabel, damageTypeLabel } from "../vehicles/vehiclesUi";
 import { formatEur } from "./rentalUi";
 
 function safeText(value: string | null | undefined): string {
@@ -649,7 +649,9 @@ export async function buildDamageListPdf(rental: Rental): Promise<jsPDF> {
   const vehicleId = rental.vehicle.vehicleId;
   const vehicle = vehicleId ? getVehicle(vehicleId) : null;
   const damages = vehicle?.damages ?? [];
-  const markers = damages
+  const outsideDamages = damages.filter((damage) => (damage.surface ?? "outside") === "outside");
+  const insideDamages = damages.filter((damage) => damage.surface === "inside");
+  const markers = outsideDamages
     .map((damage) => damage.marker)
     .filter((marker): marker is { x: number; y: number } => {
       return Boolean(
@@ -719,7 +721,7 @@ export async function buildDamageListPdf(rental: Rental): Promise<jsPDF> {
       y = 20;
     }
     doc.text(String(idx + 1), 15, y);
-    doc.text(positionLabel(dmg.position), 24, y);
+    doc.text(damageLocationLabel(dmg), 24, y);
     doc.text(damageTypeLabel(dmg.type), 85, y);
     doc.text(String(dmg.severity), 130, y);
     y += 6;
@@ -731,6 +733,37 @@ export async function buildDamageListPdf(rental: Rental): Promise<jsPDF> {
       y += lines.length * 4 + 2;
     }
   });
+
+  if (insideDamages.some((damage) => damage.marker)) {
+    try {
+      const insideMarkers = insideDamages
+        .map((damage) => damage.marker)
+        .filter((marker): marker is { x: number; y: number } => {
+          return Boolean(
+            marker &&
+              typeof marker === "object" &&
+              typeof marker.x === "number" &&
+              typeof marker.y === "number" &&
+              Number.isFinite(marker.x) &&
+              Number.isFinite(marker.y),
+          );
+        })
+        .map((marker) => ({ x: Math.max(0, Math.min(1, marker.x)), y: Math.max(0, Math.min(1, marker.y)) }));
+      const renderedInside = await renderSketchWithMarkers({ imageSrc: "/sketch/innen.png", markers: insideMarkers, width: 1200 });
+      doc.addPage();
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("Schadensskizze innen", 15, 20);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(`Vermietungs-ID: ${rental.id}`, 15, 28);
+      const sketchW = 180;
+      const sketchH = Math.min(220, (renderedInside.height / renderedInside.width) * sketchW);
+      doc.addImage(renderedInside.dataUrl, "PNG", 15, 40, sketchW, sketchH);
+    } catch {
+      // Schadensliste bleibt auch ohne Innen-Skizze exportierbar.
+    }
+  }
 
   return doc;
 }
