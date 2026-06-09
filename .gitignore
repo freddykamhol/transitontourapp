@@ -28,5 +28,3 @@ data/
 *.sln
 *.sw?
 
-# Manuell gepflegte Skizzenbilder - nicht durch Codex/Deployments überschreiben
-public/sketch/innen.png
