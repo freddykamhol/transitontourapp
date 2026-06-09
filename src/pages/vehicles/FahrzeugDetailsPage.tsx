@@ -670,7 +670,7 @@ export default function FahrzeugDetailsPage() {
                 onClick={async () => {
                   await downloadSketchPng({
                     filename: `skizze_innen_${data.vehicle.licensePlate.replaceAll(" ", "_")}.png`,
-                    imageSrc: `${import.meta.env.BASE_URL}sketch/innen2.png`,
+                    imageSrc: `${import.meta.env.BASE_URL}sketch/innen.png`,
                     damages: data.damages.filter((damage) => damage.surface === "inside"),
                   });
                 }}
@@ -686,7 +686,7 @@ export default function FahrzeugDetailsPage() {
               await downloadDamagePdf({
                 filename: `schadenuebersicht_${data.vehicle.licensePlate.replaceAll(" ", "_")}.pdf`,
                 imageSrc: `${import.meta.env.BASE_URL}sketch/vehicle-top.png`,
-                interiorImageSrc: `${import.meta.env.BASE_URL}sketch/innen2.png`,
+                interiorImageSrc: `${import.meta.env.BASE_URL}sketch/innen.png`,
                 vehicleLabel: vehicleDisplayName(data.vehicle),
                 damages: data.damages,
                 kind,
@@ -959,7 +959,7 @@ export default function FahrzeugDetailsPage() {
               <div className="grid gap-2">
                 <div className="text-xs font-semibold text-slate-600">{damageForm.surface === "inside" ? "Innen-Skizze" : "Außen-Skizze"}</div>
                 <DamageSketch
-                  imageSrc={`${import.meta.env.BASE_URL}sketch/${damageForm.surface === "inside" ? "innen2.png" : "vehicle-top.png"}`}
+                  imageSrc={`${import.meta.env.BASE_URL}sketch/${damageForm.surface === "inside" ? "innen.png" : "vehicle-top.png"}`}
                   marker={damageForm.marker}
                   onMarkerChange={(marker) =>
                     setDamageForm((s) => {
