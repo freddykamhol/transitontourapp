@@ -3,8 +3,10 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { navItems, type NavItem } from "../nav";
 import { listRequests } from "../api/portalApi";
 import { runDueRentalReminders } from "../pages/rentals/rentalReminderScheduler";
+import { latestRelease } from "../releaseNotes";
 
 const defaultBrand = "Transit on Tour!";
+const changelogSeenKey = `tot.changelog.seen.${latestRelease.id}`;
 
 function getBrandText(): string {
   const brand = (import.meta.env.VITE_PORTAL_BRAND as string | undefined)?.trim();
@@ -23,6 +25,7 @@ export default function AppLayout() {
   const pageTitle = getPageTitle(location.pathname, navItems);
   const brandText = getBrandText();
   const [newRequestCount, setNewRequestCount] = useState<number | null>(null);
+  const [showChangelog, setShowChangelog] = useState(false);
 
   const navBadges = useMemo(() => {
     return {
@@ -57,6 +60,23 @@ export default function AppLayout() {
     }, 60_000);
     return () => window.clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    try {
+      setShowChangelog(localStorage.getItem(changelogSeenKey) !== "1");
+    } catch {
+      setShowChangelog(true);
+    }
+  }, []);
+
+  function closeChangelog(): void {
+    try {
+      localStorage.setItem(changelogSeenKey, "1");
+    } catch {
+      // Popup wird trotzdem geschlossen, wenn der Browser Speicher blockiert.
+    }
+    setShowChangelog(false);
+  }
 
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900">
@@ -169,6 +189,41 @@ export default function AppLayout() {
           ))}
         </div>
       </nav>
+
+      {showChangelog ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4" role="dialog" aria-modal="true" aria-labelledby="release-notes-title">
+          <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-100 bg-slate-50 px-5 py-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Neu im Portal · {latestRelease.date}</div>
+              <h2 id="release-notes-title" className="mt-1 text-lg font-semibold tracking-tight text-slate-900">
+                {latestRelease.title}
+              </h2>
+            </div>
+            <div className="px-5 py-5">
+              <ul className="grid gap-3 text-sm text-slate-700">
+                {latestRelease.highlights.map((highlight) => (
+                  <li key={highlight} className="flex gap-3">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-slate-900" aria-hidden="true" />
+                    <span>{highlight}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                Dieser Hinweis erscheint pro Gerät/Browser einmal je Release.
+              </div>
+            </div>
+            <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+              <button
+                type="button"
+                onClick={closeChangelog}
+                className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+              >
+                Verstanden
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
