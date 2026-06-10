@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listRequests, type RequestListItem } from "../api/portalApi";
+import { rentalPartyName } from "../domain/rental";
 import { listRentals, getRentalStatus } from "../storage/rentalRepo";
 import { listVehicles } from "../storage/vehicleRepo";
 import { formatDateTime } from "./anfragen/uiUtils";
@@ -163,7 +164,7 @@ export default function DashboardPage() {
                 <Link key={rental.id} to={`/vermietungen/${rental.id}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:bg-white">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-slate-900">{rental.tenant.name || "Ohne Mietername"}</div>
+                      <div className="truncate text-sm font-semibold text-slate-900">{rentalPartyName(rental.tenant) || "Ohne Mietername"}</div>
                       <div className="truncate text-xs text-slate-500">{rental.vehicle.label}</div>
                     </div>
                     <div className="shrink-0 text-right">
@@ -212,7 +213,7 @@ export default function DashboardPage() {
                 rentalStats.planned.slice(0, 6).map((rental) => (
                   <tr key={rental.id} className="text-sm text-slate-900">
                     <td className="px-4 py-3 font-semibold">{rental.id}</td>
-                    <td className="px-4 py-3">{rental.tenant.name || "—"}</td>
+                    <td className="px-4 py-3">{rentalPartyName(rental.tenant) || "—"}</td>
                     <td className="px-4 py-3 text-slate-700">{rental.vehicle.label}</td>
                     <td className="px-4 py-3 text-slate-700">{formatDateTime(rental.startAt)}</td>
                     <td className="px-4 py-3 font-semibold">{formatEur(rentalRevenue(rental))}</td>
@@ -234,7 +235,7 @@ export default function DashboardPage() {
               <Link key={rental.id} to={`/vermietungen/${rental.id}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:bg-slate-50">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-900">{rental.tenant.name || "—"}</div>
+                    <div className="truncate text-sm font-semibold text-slate-900">{rentalPartyName(rental.tenant) || "—"}</div>
                     <div className="mt-1 truncate text-xs text-slate-500">{rental.vehicle.label}</div>
                   </div>
                   <div className="shrink-0 text-right text-xs font-semibold text-slate-900">{formatEur(rentalRevenue(rental))}</div>

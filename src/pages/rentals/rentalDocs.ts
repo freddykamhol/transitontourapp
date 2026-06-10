@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import type { Rental, RentalAddon, RentalDigitalSignature, RentalParty } from "../../domain/rental";
+import { rentalPartyName, type Rental, type RentalAddon, type RentalDigitalSignature, type RentalParty } from "../../domain/rental";
 import { getCompanyData } from "../../storage/companyRepo";
 import { getVehicle } from "../../storage/vehicleRepo";
 import { renderSketchWithMarkers } from "../vehicles/exportDamageSketch";
@@ -257,7 +257,7 @@ export function buildRentalContractPdf(rental: Rental): jsPDF {
   doc.text(isEquipmentRental ? "Nur die nachstehend genannten Mieter/Nutzer sind zur Nutzung des Geräts berechtigt." : "Nur die nachstehend genannten Mieter/Fahrer sind zum Führen des Fahrzeugs berechtigt.", page.left, y);
   y += 5;
   const driverFields: Array<[string, (party: RentalParty) => string]> = [
-    ["Name, Vorname", (party) => party.name],
+    ["Name", (party) => rentalPartyName(party)],
     ["Adresse", partyAddress],
     ["Telefon mobil", (party) => safeText(party.phone)],
     ["Geburtstag", (party) => formatDate(party.birthDate)],
@@ -572,7 +572,7 @@ export function buildReturnChecklistPdf(rental: Rental): jsPDF {
   doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
   doc.text(`Vermietung: ${rental.id}`, 22, 43);
-  doc.text(`Mieter: ${rental.tenant.name}`, 22, 51);
+  doc.text(`Mieter: ${rentalPartyName(rental.tenant)}`, 22, 51);
   doc.text(`Mietobjekt: ${itemLabel}`, 22, 59);
   doc.text(`Geplante Rückgabe: ${formatDate(rental.endAt)}`, 22, 67);
 

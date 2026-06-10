@@ -1,5 +1,15 @@
 import { useMemo, useState } from "react";
-import type { Rental, RentalAddon, RentalInsurance, RentalParty, RentalPayment, RentalReminderAttachmentSelection, RentalVehicleRef } from "../../../domain/rental";
+import {
+  normalizeRentalPartyNameParts,
+  rentalPartyName,
+  type Rental,
+  type RentalAddon,
+  type RentalInsurance,
+  type RentalParty,
+  type RentalPayment,
+  type RentalReminderAttachmentSelection,
+  type RentalVehicleRef,
+} from "../../../domain/rental";
 import type { ServiceItem } from "../../../domain/service";
 import { listServices } from "../../../storage/serviceRepo";
 import { listVehicles } from "../../../storage/vehicleRepo";
@@ -68,7 +78,12 @@ function fromLocalDateTime(value: string): string {
 }
 
 function defaultTenant(): RentalParty {
-  return { name: "", email: "", phone: "" };
+  return { name: "", salutation: "", title: "", firstNames: "", lastName: "", email: "", phone: "" };
+}
+
+function updatePartyName(party: RentalParty, patch: Partial<RentalParty>): RentalParty {
+  const next = { ...party, ...patch };
+  return { ...next, name: rentalPartyName(next) };
 }
 
 function defaultPayment(): RentalPayment {
@@ -130,9 +145,9 @@ export default function RentalForm(props: {
         rentalKind: initial.vehicle?.kind ?? "vehicle",
         startAt: initial.startAt,
         endAt: initial.endAt,
-        tenant: initial.tenant,
+        tenant: normalizeRentalPartyNameParts(initial.tenant),
         vehicle: initial.vehicle ?? null,
-        additionalDrivers: initial.additionalDrivers ?? [],
+        additionalDrivers: (initial.additionalDrivers ?? []).map(normalizeRentalPartyNameParts),
         insurance: initial.insurance ?? { kind: "basis" },
         addons: initial.addons ?? [],
         payment: initial.payment ?? defaultPayment(),
@@ -163,7 +178,9 @@ export default function RentalForm(props: {
 
   const canSubmit = useMemo(() => {
     if (!state.vehicle) return false;
-    if (state.tenant.name.trim().length === 0) return false;
+    const hasStructuredTenantName = Boolean((state.tenant.firstNames ?? "").trim() && (state.tenant.lastName ?? "").trim());
+    const hasLegacyTenantName = Boolean(!(state.tenant.firstNames ?? "").trim() && !(state.tenant.lastName ?? "").trim() && !(state.tenant.salutation ?? "").trim() && !(state.tenant.title ?? "").trim() && state.tenant.name.trim());
+    if (!hasStructuredTenantName && !hasLegacyTenantName) return false;
     if (state.tenant.email.trim().length === 0) return false;
     if (!state.startAt || !state.endAt) return false;
     if (new Date(state.endAt).getTime() <= new Date(state.startAt).getTime()) return false;
@@ -264,21 +281,54 @@ export default function RentalForm(props: {
         description={state.rentalKind === "equipment" ? "Kontaktdaten und Identifikation für die Gerätemiete." : "Kontaktdaten + Führerschein optional."}
       >
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Name">
-            <input
-              value={state.tenant.name}
-              disabled={Boolean(readOnly.tenant)}
-              onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, name: e.target.value } }))}
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
-              required
-            />
-          </Field>
+          <div className="grid gap-4 md:col-span-2 md:grid-cols-[140px_140px_1fr_1fr]">
+            <Field label="Anrede">
+              <select
+                value={state.tenant.salutation ?? ""}
+                disabled={Boolean(readOnly.tenant)}
+                onChange={(e) => setState((s) => ({ ...s, tenant: updatePartyName(s.tenant, { salutation: e.target.value as RentalParty["salutation"] }) }))}
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+              >
+                <option value="">—</option>
+                <option value="herr">Herr</option>
+                <option value="frau">Frau</option>
+                <option value="divers">Divers</option>
+              </select>
+            </Field>
+            <Field label="Titel">
+              <input
+                value={state.tenant.title ?? ""}
+                disabled={Boolean(readOnly.tenant)}
+                onChange={(e) => setState((s) => ({ ...s, tenant: updatePartyName(s.tenant, { title: e.target.value }) }))}
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                placeholder="Dr."
+              />
+            </Field>
+            <Field label="Vorname(n)">
+              <input
+                value={state.tenant.firstNames ?? ""}
+                disabled={Boolean(readOnly.tenant)}
+                onChange={(e) => setState((s) => ({ ...s, tenant: updatePartyName(s.tenant, { firstNames: e.target.value }) }))}
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                required
+              />
+            </Field>
+            <Field label="Nachname">
+              <input
+                value={state.tenant.lastName ?? ""}
+                disabled={Boolean(readOnly.tenant)}
+                onChange={(e) => setState((s) => ({ ...s, tenant: updatePartyName(s.tenant, { lastName: e.target.value }) }))}
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                required
+              />
+            </Field>
+          </div>
           <Field label="E-Mail">
             <input
               type="email"
               value={state.tenant.email}
               disabled={Boolean(readOnly.tenant)}
-              onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, email: e.target.value } }))}
+              onChange={(e) => setState((s) => ({ ...s, tenant: updatePartyName(s.tenant, { email: e.target.value }) }))}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
               required
             />
@@ -287,7 +337,7 @@ export default function RentalForm(props: {
             <input
               value={state.tenant.phone ?? ""}
               disabled={Boolean(readOnly.tenant)}
-              onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, phone: e.target.value } }))}
+              onChange={(e) => setState((s) => ({ ...s, tenant: updatePartyName(s.tenant, { phone: e.target.value }) }))}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
             />
           </Field>
@@ -295,7 +345,7 @@ export default function RentalForm(props: {
             <input
               value={state.tenant.addressLine1 ?? ""}
               disabled={Boolean(readOnly.tenant)}
-              onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, addressLine1: e.target.value } }))}
+              onChange={(e) => setState((s) => ({ ...s, tenant: updatePartyName(s.tenant, { addressLine1: e.target.value }) }))}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
               placeholder="Straße, Nr."
             />
@@ -304,7 +354,7 @@ export default function RentalForm(props: {
             <input
               value={state.tenant.postalCode ?? ""}
               disabled={Boolean(readOnly.tenant)}
-              onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, postalCode: e.target.value } }))}
+              onChange={(e) => setState((s) => ({ ...s, tenant: updatePartyName(s.tenant, { postalCode: e.target.value }) }))}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
             />
           </Field>
@@ -312,7 +362,7 @@ export default function RentalForm(props: {
             <input
               value={state.tenant.city ?? ""}
               disabled={Boolean(readOnly.tenant)}
-              onChange={(e) => setState((s) => ({ ...s, tenant: { ...s.tenant, city: e.target.value } }))}
+              onChange={(e) => setState((s) => ({ ...s, tenant: updatePartyName(s.tenant, { city: e.target.value }) }))}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
             />
           </Field>
@@ -454,18 +504,62 @@ export default function RentalForm(props: {
                   </button>
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <Field label="Name">
-                    <input
-                      value={d.name}
-                      onChange={(e) =>
-                        setState((s) => ({
-                          ...s,
-                          additionalDrivers: s.additionalDrivers.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)),
-                        }))
-                      }
-                      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
-                    />
-                  </Field>
+                  <div className="grid gap-3 md:col-span-2 md:grid-cols-[140px_140px_1fr_1fr]">
+                    <Field label="Anrede">
+                      <select
+                        value={d.salutation ?? ""}
+                        onChange={(e) =>
+                          setState((s) => ({
+                            ...s,
+                            additionalDrivers: s.additionalDrivers.map((x, i) => (i === idx ? updatePartyName(x, { salutation: e.target.value as RentalParty["salutation"] }) : x)),
+                          }))
+                        }
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                      >
+                        <option value="">—</option>
+                        <option value="herr">Herr</option>
+                        <option value="frau">Frau</option>
+                        <option value="divers">Divers</option>
+                      </select>
+                    </Field>
+                    <Field label="Titel">
+                      <input
+                        value={d.title ?? ""}
+                        onChange={(e) =>
+                          setState((s) => ({
+                            ...s,
+                            additionalDrivers: s.additionalDrivers.map((x, i) => (i === idx ? updatePartyName(x, { title: e.target.value }) : x)),
+                          }))
+                        }
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                        placeholder="Dr."
+                      />
+                    </Field>
+                    <Field label="Vorname(n)">
+                      <input
+                        value={d.firstNames ?? ""}
+                        onChange={(e) =>
+                          setState((s) => ({
+                            ...s,
+                            additionalDrivers: s.additionalDrivers.map((x, i) => (i === idx ? updatePartyName(x, { firstNames: e.target.value }) : x)),
+                          }))
+                        }
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                      />
+                    </Field>
+                    <Field label="Nachname">
+                      <input
+                        value={d.lastName ?? ""}
+                        onChange={(e) =>
+                          setState((s) => ({
+                            ...s,
+                            additionalDrivers: s.additionalDrivers.map((x, i) => (i === idx ? updatePartyName(x, { lastName: e.target.value }) : x)),
+                          }))
+                        }
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
+                      />
+                    </Field>
+                  </div>
                   <Field label="Telefon mobil">
                     <input
                       value={d.phone ?? ""}

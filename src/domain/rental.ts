@@ -2,6 +2,10 @@ export type RentalId = string;
 
 export type RentalParty = {
   name: string;
+  salutation?: "herr" | "frau" | "divers" | "";
+  title?: string;
+  firstNames?: string;
+  lastName?: string;
   email: string;
   phone?: string;
   birthDate?: string;
@@ -15,6 +19,34 @@ export type RentalParty = {
   driverLicenseIssuedBy?: string;
   driverLicenseValidUntil?: string; // ISO date
 };
+
+export function rentalPartyName(party: Pick<RentalParty, "name" | "salutation" | "title" | "firstNames" | "lastName">): string {
+  const salutationLabel = party.salutation === "herr" ? "Herr" : party.salutation === "frau" ? "Frau" : "";
+  const structured = [salutationLabel, party.title, party.firstNames, party.lastName]
+    .map((part) => (part ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+  return structured || party.name || "";
+}
+
+export function rentalPartyFirstName(party: Pick<RentalParty, "name" | "firstNames">): string {
+  const firstNames = (party.firstNames ?? "").trim();
+  if (firstNames) return firstNames.split(/\s+/)[0] ?? firstNames;
+  return (party.name ?? "").trim().split(/\s+/)[0] ?? "";
+}
+
+export function normalizeRentalPartyNameParts(party: RentalParty): RentalParty {
+  if ((party.firstNames ?? "").trim() || (party.lastName ?? "").trim()) {
+    return { ...party, name: rentalPartyName(party) };
+  }
+  const parts = (party.name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return party;
+  return {
+    ...party,
+    firstNames: parts.slice(0, -1).join(" "),
+    lastName: parts.at(-1) ?? "",
+  };
+}
 
 export type RentalVehicleRef = {
   vehicleId: string;

@@ -1,4 +1,4 @@
-import type { Rental, RentalSignerKey } from "../../domain/rental";
+import { rentalPartyName, type Rental, type RentalSignerKey } from "../../domain/rental";
 import { prepareRentalSignaturePackage, sendMail } from "../../api/portalApi";
 import { buildDamageListPdf, buildRentalContractPdf } from "./rentalDocs";
 
@@ -20,7 +20,7 @@ function signatureUrl(rental: Rental, signer: RentalSignerKey): string {
 
 export function buildRentalDocumentsMailText(rental: Rental, signer: RentalSignerKey): string {
   const party = signer === "tenant2" ? rental.additionalDrivers[0] : rental.tenant;
-  const name = party?.name?.trim() || "Hallo";
+  const name = party ? rentalPartyName(party) || "Hallo" : "Hallo";
   return [
     `Hallo ${name},`,
     "",

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import type { Rental } from "../../domain/rental";
+import { rentalPartyName, type Rental } from "../../domain/rental";
 import { getRentalSignaturePackage, sendMail } from "../../api/portalApi";
 import { deleteRental, getRental, getRentalStatus, markReturned, updateRental } from "../../storage/rentalRepo";
 import RentalForm from "./components/RentalForm";
@@ -195,6 +195,7 @@ export default function VermietungDetailsPage() {
   }
 
   const statusText = meta?.overdue ? "Überfällig" : statusLabel(meta?.status ?? "laufend");
+  const tenantName = rentalPartyName(rental.tenant);
 
   return (
     <div className="grid gap-6">
@@ -202,7 +203,7 @@ export default function VermietungDetailsPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-sm font-semibold tracking-tight">{rental.tenant.name || "Vermietung"}</h2>
+              <h2 className="truncate text-sm font-semibold tracking-tight">{tenantName || "Vermietung"}</h2>
               <Pill text={statusText} className={rentalPillClass(rental)} />
               <span className="text-xs text-slate-500">{rental.id}</span>
             </div>
@@ -223,7 +224,7 @@ export default function VermietungDetailsPage() {
               href={mailto(
                 rental.tenant.email,
                 `Vermietung ${rental.id} – ${rental.vehicle.licensePlate ?? ""}`.trim(),
-                `Hallo ${rental.tenant.name},\n\nkurzes Update zu deiner Vermietung (${rental.id}).\n\nViele Grüße`,
+                `Hallo ${tenantName},\n\nkurzes Update zu deiner Vermietung (${rental.id}).\n\nViele Grüße`,
               )}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
             >
@@ -402,7 +403,7 @@ export default function VermietungDetailsPage() {
                           subject: s.subject || `Vermietung ${rental.id} – ${d.title}`,
                           body:
                             s.body ||
-                            `Hallo ${rental.tenant.name},\n\nanbei die Unterlagen zu deiner Vermietung (${rental.id}).\n\nViele Grüße`,
+                            `Hallo ${tenantName},\n\nanbei die Unterlagen zu deiner Vermietung (${rental.id}).\n\nViele Grüße`,
                         }));
                         setSendOpen({ doc: d.id });
                       }}
@@ -733,7 +734,7 @@ export default function VermietungDetailsPage() {
         <div className="grid gap-4 text-sm">
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
             <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Mieter</div>
-            <div className="mt-2 font-semibold text-slate-900">{rental.tenant.name}</div>
+            <div className="mt-2 font-semibold text-slate-900">{tenantName}</div>
             <div className="mt-1 text-xs text-slate-600">{rental.tenant.email}</div>
             {rental.tenant.phone ? <div className="mt-1 text-xs text-slate-600">{rental.tenant.phone}</div> : null}
             {rental.tenant.addressLine1 ? <div className="mt-2 text-xs text-slate-600">{rental.tenant.addressLine1}</div> : null}
@@ -747,7 +748,7 @@ export default function VermietungDetailsPage() {
               <div className="mt-2 grid gap-2">
                 {rental.additionalDrivers.map((d, idx) => (
                   <div key={idx} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-sm font-semibold text-slate-900">{d.name || `Zusatzfahrer #${idx + 1}`}</div>
+                    <div className="text-sm font-semibold text-slate-900">{rentalPartyName(d) || `Zusatzfahrer #${idx + 1}`}</div>
                     {d.email ? <div className="mt-1 text-xs text-slate-600">{d.email}</div> : null}
                   </div>
                 ))}

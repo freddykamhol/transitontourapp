@@ -1,5 +1,5 @@
 import type { ReminderMailSettings } from "../../domain/reminder";
-import type { Rental } from "../../domain/rental";
+import { rentalPartyName, type Rental } from "../../domain/rental";
 import type { jsPDF } from "jspdf";
 import { sendMail } from "../../api/portalApi";
 import { getVehicle } from "../../storage/vehicleRepo";
@@ -25,7 +25,7 @@ function formatDateTime(value: string): string {
 
 function renderTemplate(template: string, rental: Rental): string {
   return template
-    .replaceAll("{name}", rental.tenant.name || "Hallo")
+    .replaceAll("{name}", rentalPartyName(rental.tenant) || "Hallo")
     .replaceAll("{id}", rental.id)
     .replaceAll("{objekt}", rental.vehicle.label)
     .replaceAll("{rueckgabe}", formatDateTime(rental.endAt));

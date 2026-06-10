@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { RentalDigitalSignature, RentalSignedContract, RentalSignerKey } from "../../domain/rental";
-import type { Rental } from "../../domain/rental";
+import { rentalPartyName, type Rental, type RentalDigitalSignature, type RentalSignedContract, type RentalSignerKey } from "../../domain/rental";
 import { getPublicRentalSignaturePackage, prepareRentalSignaturePackage, savePublicRentalSignature } from "../../api/portalApi";
 import { getRental, updateRental } from "../../storage/rentalRepo";
 import { buildSignedRentalContractPdf, downloadRentalContractPdf } from "./rentalDocs";
@@ -56,7 +55,7 @@ function signerLabel(signer: RentalSignerKey): string {
 
 function signerName(rental: Rental, signer: RentalSignerKey): string {
   const party = signer === "tenant2" ? rental.additionalDrivers[0] : rental.tenant;
-  return party?.name?.trim() || signerLabel(signer);
+  return party ? rentalPartyName(party) || signerLabel(signer) : signerLabel(signer);
 }
 
 function signatureUrl(rentalId: string, signer: RentalSignerKey): string {
@@ -157,7 +156,7 @@ export default function RentalSignaturePage() {
     );
   }
 
-  const hasSecondTenant = Boolean(rental.additionalDrivers[0]?.name || rental.additionalDrivers[0]?.email);
+  const hasSecondTenant = Boolean((rental.additionalDrivers[0] && rentalPartyName(rental.additionalDrivers[0])) || rental.additionalDrivers[0]?.email);
   const activeSigner = selectedSigner ?? (hasSecondTenant ? null : "tenant1");
   const tenant1Signature = digitalSignatures.find((signature) => signature.signer === "tenant1");
   const tenant2Signature = digitalSignatures.find((signature) => signature.signer === "tenant2");

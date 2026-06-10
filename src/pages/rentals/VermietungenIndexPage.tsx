@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Rental } from "../../domain/rental";
+import { rentalPartyName, type Rental } from "../../domain/rental";
 import { getRentalStatus, listRentals, type RentalStatus } from "../../storage/rentalRepo";
 import { formatDateTime, formatEur, rentalPillClass, statusLabel } from "./rentalUi";
 
@@ -17,11 +17,11 @@ function matchesQuery(r: Rental, q: string): boolean {
   if (!qq) return true;
   const hay = [
     r.id,
-    r.tenant?.name,
+    rentalPartyName(r.tenant),
     r.tenant?.email,
     r.vehicle?.label,
     r.vehicle?.licensePlate,
-    ...r.additionalDrivers.map((d) => d.name),
+    ...r.additionalDrivers.map((d) => rentalPartyName(d)),
   ]
     .filter(Boolean)
     .join(" ")
@@ -140,7 +140,7 @@ export default function VermietungenIndexPage() {
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">{r.tenant.name || "Ohne Name"}</div>
+                  <div className="truncate text-sm font-semibold">{rentalPartyName(r.tenant) || "Ohne Name"}</div>
                   <div className="mt-1 truncate text-xs text-slate-500">{r.vehicle.label}</div>
                 </div>
                 <Pill text={meta.overdue ? "Überfällig" : statusLabel(meta.status)} className={rentalPillClass(r)} />
@@ -182,7 +182,7 @@ export default function VermietungenIndexPage() {
                   <tr key={r.id} className={meta.overdue ? "bg-rose-50/40" : ""}>
                     <td className="px-5 py-4">
                       <Link to={`/vermietungen/${encodeURIComponent(r.id)}`} className="font-semibold text-slate-900 hover:underline">
-                        {r.tenant.name || "Ohne Name"}
+                        {rentalPartyName(r.tenant) || "Ohne Name"}
                       </Link>
                       <div className="mt-1 text-xs text-slate-500">{r.tenant.email}</div>
                     </td>
