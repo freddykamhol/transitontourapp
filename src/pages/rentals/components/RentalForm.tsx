@@ -281,7 +281,7 @@ export default function RentalForm(props: {
         description={state.rentalKind === "equipment" ? "Kontaktdaten und Identifikation für die Gerätemiete." : "Kontaktdaten + Führerschein optional."}
       >
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="grid gap-4 md:col-span-2 md:grid-cols-[140px_140px_1fr_1fr]">
+          <div className="grid grid-cols-2 gap-4 md:col-span-2">
             <Field label="Anrede">
               <select
                 value={state.tenant.salutation ?? ""}
@@ -504,7 +504,7 @@ export default function RentalForm(props: {
                   </button>
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div className="grid gap-3 md:col-span-2 md:grid-cols-[140px_140px_1fr_1fr]">
+                  <div className="grid grid-cols-2 gap-3 md:col-span-2">
                     <Field label="Anrede">
                       <select
                         value={d.salutation ?? ""}
