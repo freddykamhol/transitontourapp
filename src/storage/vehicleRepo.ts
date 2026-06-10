@@ -1,4 +1,4 @@
-import type { DamageReport, MaintenanceEntry, MaintenanceStatus, OdometerEntry, Vehicle, VehicleDb } from "../domain/vehicle";
+import type { DamageReport, InventoryDocument, MaintenanceEntry, MaintenanceStatus, OdometerEntry, Vehicle, VehicleDb } from "../domain/vehicle";
 import { createId } from "../lib/id";
 import { nowIso } from "../lib/time";
 import { loadVehicleDb, saveVehicleDb } from "./vehicleDb";
@@ -65,6 +65,33 @@ export function updateVehicle(vehicleId: string, patch: Partial<Omit<Vehicle, "i
   db.vehicles[idx] = updated;
   saveVehicleDb(db);
   return updated;
+}
+
+export function addInventoryDocument(vehicleId: string, document: Omit<InventoryDocument, "id" | "uploadedAt">): Vehicle {
+  const db = loadVehicleDb();
+  const idx = db.vehicles.findIndex((v) => v.id === vehicleId);
+  if (idx < 0) throw new Error("Vehicle not found");
+  const doc: InventoryDocument = { ...document, id: createId("doc"), uploadedAt: nowIso() };
+  const vehicle = db.vehicles[idx];
+  const key = doc.category === "general_equipment" ? "generalDocuments" : "reminderDocuments";
+  db.vehicles[idx] = { ...vehicle, [key]: [...(vehicle[key] ?? []), doc], updatedAt: nowIso() };
+  saveVehicleDb(db);
+  return db.vehicles[idx];
+}
+
+export function deleteInventoryDocument(vehicleId: string, documentId: string): Vehicle {
+  const db = loadVehicleDb();
+  const idx = db.vehicles.findIndex((v) => v.id === vehicleId);
+  if (idx < 0) throw new Error("Vehicle not found");
+  const vehicle = db.vehicles[idx];
+  db.vehicles[idx] = {
+    ...vehicle,
+    reminderDocuments: (vehicle.reminderDocuments ?? []).filter((doc) => doc.id !== documentId),
+    generalDocuments: (vehicle.generalDocuments ?? []).filter((doc) => doc.id !== documentId),
+    updatedAt: nowIso(),
+  };
+  saveVehicleDb(db);
+  return db.vehicles[idx];
 }
 
 export function deleteVehicle(vehicleId: string): void {

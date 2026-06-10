@@ -19,9 +19,20 @@ export type Vehicle = {
   registrationDocumentNumber?: string;
   accessoryForVehicleRental?: boolean;
   dailyRentalPriceEur?: number;
+  reminderDocuments?: InventoryDocument[];
+  generalDocuments?: InventoryDocument[];
 
   status: VehicleStatus;
   notes?: string;
+};
+
+export type InventoryDocument = {
+  id: Id;
+  filename: string;
+  contentBase64: string;
+  contentType: string;
+  uploadedAt: string;
+  category: "specific_documents" | "general_equipment";
 };
 
 export type MaintenanceStatus = "geplant" | "in_arbeit" | "erledigt";

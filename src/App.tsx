@@ -14,6 +14,7 @@ import EinstellungenFirmendatenPage from "./pages/settings/EinstellungenFirmenda
 import EinstellungenLeistungenPage from "./pages/settings/EinstellungenLeistungenPage";
 import EinstellungenStatusPage from "./pages/settings/EinstellungenStatusPage";
 import EinstellungenBenutzerPage from "./pages/settings/EinstellungenBenutzerPage";
+import EinstellungenErinnerungsmailPage from "./pages/settings/EinstellungenErinnerungsmailPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import FahrzeugeIndexPage from "./pages/vehicles/FahrzeugeIndexPage";
 import FahrzeugNeuPage from "./pages/vehicles/FahrzeugNeuPage";
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="leistungen" element={<EinstellungenLeistungenPage />} />
             <Route path="status" element={<EinstellungenStatusPage />} />
             <Route path="benutzer" element={<EinstellungenBenutzerPage />} />
+            <Route path="erinnerungsmail" element={<EinstellungenErinnerungsmailPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>

@@ -541,6 +541,10 @@ export default function VermietungDetailsPage() {
                   insurance: value.insurance,
                   addons: value.addons,
                   payment: value.payment,
+                  reminderWorkflow: {
+                    ...rental.reminderWorkflow,
+                    attachmentSelections: value.reminderAttachmentSelections,
+                  },
                   internalNotes: value.internalNotes,
                 };
 
@@ -550,6 +554,7 @@ export default function VermietungDetailsPage() {
                     additionalDrivers: patch.additionalDrivers,
                     addons: patch.addons,
                     insurance: patch.insurance,
+                    reminderWorkflow: patch.reminderWorkflow,
                     internalNotes: patch.internalNotes,
                   });
                 } else {

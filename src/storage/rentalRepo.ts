@@ -1,4 +1,4 @@
-import type { Rental, RentalAddon, RentalInsurance, RentalParty, RentalPayment, RentalVehicleRef } from "../domain/rental";
+import type { Rental, RentalAddon, RentalInsurance, RentalParty, RentalPayment, RentalReminderAttachmentSelection, RentalVehicleRef } from "../domain/rental";
 import { createId } from "../lib/id";
 import { nowIso } from "../lib/time";
 import { loadRentalDb, saveRentalDb } from "./rentalDb";
@@ -33,6 +33,7 @@ export type CreateRentalInput = {
   insurance?: RentalInsurance;
   addons?: RentalAddon[];
   payment?: RentalPayment;
+  reminderAttachmentSelections?: RentalReminderAttachmentSelection[];
   internalNotes?: string;
 };
 
@@ -53,6 +54,7 @@ export function createRental(input: CreateRentalInput): Rental {
     insurance: input.insurance ?? { kind: "basis" },
     addons: input.addons ?? [],
     payment: input.payment ?? { method: "karte", status: "offen", totalEur: 0, paidEur: 0 },
+    reminderWorkflow: { attachmentSelections: input.reminderAttachmentSelections ?? [] },
     internalNotes: input.internalNotes ?? "",
   };
 

@@ -84,6 +84,18 @@ export type RentalContractWorkflow = {
   signedContract?: RentalSignedContract;
 };
 
+export type RentalReminderAttachmentSelection = {
+  itemId: string;
+  documentIds: string[];
+};
+
+export type RentalReminderWorkflow = {
+  attachmentSelections?: RentalReminderAttachmentSelection[];
+  sentAt?: string;
+  messageId?: string | null;
+  lastError?: string;
+};
+
 export type Rental = {
   id: RentalId;
   createdAt: string;
@@ -113,6 +125,7 @@ export type Rental = {
   payment: RentalPayment;
 
   contractWorkflow?: RentalContractWorkflow;
+  reminderWorkflow?: RentalReminderWorkflow;
   internalNotes?: string;
 };
 

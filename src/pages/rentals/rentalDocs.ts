@@ -538,6 +538,78 @@ export function downloadRentalContractPdf(rental: Rental): void {
   doc.save(`mietvertrag-${rental.id}.pdf`);
 }
 
+export function buildReturnChecklistPdf(rental: Rental): jsPDF {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const company = getCompanyData();
+  const vehicleRecord = rental.vehicle.vehicleId ? getVehicle(rental.vehicle.vehicleId)?.vehicle : null;
+  const itemLabel = rental.vehicle.label || compact([vehicleRecord?.brand, vehicleRecord?.model, vehicleRecord?.licensePlate]);
+  const checklist = [
+    "Mietobjekt äußerlich geprüft",
+    "Innenraum / Nutzbereich geprüft",
+    "Kraftstoff / Ladezustand / Betriebsstoffe geprüft",
+    "Kilometerstand / Betriebsstunden dokumentiert",
+    "Zubehör vollständig zurückgegeben",
+    "Schlüssel / Dokumente / Bedienungsanleitungen zurückgegeben",
+    "Neue Schäden dokumentiert",
+    "Reinigung geprüft",
+    "Zahlung / Kaution geklärt",
+  ];
+
+  doc.setFillColor(248, 250, 252);
+  doc.rect(0, 0, 210, 297, "F");
+  doc.setTextColor(15, 23, 42);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("Rückgabecheckliste", 15, 20);
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(company.company || "Transit on Tour", 195, 20, { align: "right" });
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(15, 32, 180, 42, 3, 3, "FD");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Vermietung: ${rental.id}`, 22, 43);
+  doc.text(`Mieter: ${rental.tenant.name}`, 22, 51);
+  doc.text(`Mietobjekt: ${itemLabel}`, 22, 59);
+  doc.text(`Geplante Rückgabe: ${formatDate(rental.endAt)}`, 22, 67);
+
+  let y = 90;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Prüfpunkte", 15, y);
+  y += 8;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  checklist.forEach((item) => {
+    doc.rect(16, y - 4, 4, 4);
+    doc.text(item, 24, y);
+    y += 9;
+  });
+
+  y += 6;
+  doc.setFont("helvetica", "bold");
+  doc.text("Bemerkungen", 15, y);
+  y += 6;
+  doc.setDrawColor(203, 213, 225);
+  for (let i = 0; i < 5; i += 1) {
+    doc.line(15, y, 195, y);
+    y += 9;
+  }
+
+  y += 10;
+  doc.line(15, y, 82, y);
+  doc.line(112, y, 195, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text("Datum / Vermieter", 15, y + 5);
+  doc.text("Datum / Mieter", 112, y + 5);
+
+  return doc;
+}
+
 export function buildSignedRentalContractPdf(rental: Rental, signatures: RentalDigitalSignature[]): jsPDF {
   const doc = buildRentalContractPdf(rental);
   const pageCount = doc.getNumberOfPages();

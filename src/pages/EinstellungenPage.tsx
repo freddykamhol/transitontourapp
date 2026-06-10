@@ -32,6 +32,7 @@ export default function EinstellungenPage() {
             <TabLink to="/einstellungen/leistungen" label="Leistungen" />
             <TabLink to="/einstellungen/status" label="Status" />
             <TabLink to="/einstellungen/benutzer" label="Benutzer" />
+            <TabLink to="/einstellungen/erinnerungsmail" label="Erinnerungsmail" />
           </div>
         </div>
       </section>

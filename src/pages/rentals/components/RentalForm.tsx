@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Rental, RentalAddon, RentalInsurance, RentalParty, RentalPayment, RentalVehicleRef } from "../../../domain/rental";
+import type { Rental, RentalAddon, RentalInsurance, RentalParty, RentalPayment, RentalReminderAttachmentSelection, RentalVehicleRef } from "../../../domain/rental";
 import type { ServiceItem } from "../../../domain/service";
 import { listServices } from "../../../storage/serviceRepo";
 import { listVehicles } from "../../../storage/vehicleRepo";
@@ -104,6 +104,7 @@ type RentalFormState = {
   insurance: RentalInsurance;
   addons: RentalAddon[];
   payment: RentalPayment;
+  reminderAttachmentSelections: RentalReminderAttachmentSelection[];
   internalNotes: string;
 };
 
@@ -135,6 +136,7 @@ export default function RentalForm(props: {
         insurance: initial.insurance ?? { kind: "basis" },
         addons: initial.addons ?? [],
         payment: initial.payment ?? defaultPayment(),
+        reminderAttachmentSelections: initial.reminderWorkflow?.attachmentSelections ?? [],
         internalNotes: initial.internalNotes ?? "",
       };
     }
@@ -154,6 +156,7 @@ export default function RentalForm(props: {
       insurance: { kind: "basis", deductibleEur: 0 },
       addons: [],
       payment: defaultPayment(),
+      reminderAttachmentSelections: [],
       internalNotes: "",
     };
   });
@@ -173,6 +176,13 @@ export default function RentalForm(props: {
   const applicableServices = services.filter((service) => (service.appliesTo ?? "both") === "both" || service.appliesTo === state.rentalKind);
   const addonTotal = state.addons.reduce((sum, item) => sum + (item.unitPriceEur ?? 0) * item.qty, 0);
   const durationDays = rentalDays(state.startAt, state.endAt);
+  const reminderItems = [
+    ...(state.vehicle?.vehicleId ? [state.vehicle.vehicleId] : []),
+    ...state.addons.map((addon) => addon.equipmentId).filter((id): id is string => Boolean(id)),
+  ]
+    .map((itemId) => inventory.find((item) => item.id === itemId))
+    .filter((item): item is (typeof inventory)[number] => Boolean(item));
+  const reminderDocumentsCount = reminderItems.reduce((sum, item) => sum + (item.reminderDocuments?.length ?? 0), 0);
   const duePreset =
     state.payment.dueKind === "date"
       ? "date"
@@ -198,14 +208,28 @@ export default function RentalForm(props: {
             title="Fahrzeug"
             description="Fahrzeugmiete mit Kennzeichen, Fahrern, Führerscheindaten, Versicherung und Fahrzeugbedingungen."
             disabled={Boolean(readOnly.vehicle)}
-            onClick={() => setState((s) => ({ ...s, rentalKind: "vehicle", vehicle: s.vehicle?.kind === "vehicle" ? s.vehicle : null }))}
+            onClick={() =>
+              setState((s) => ({
+                ...s,
+                rentalKind: "vehicle",
+                vehicle: s.vehicle?.kind === "vehicle" ? s.vehicle : null,
+                reminderAttachmentSelections: s.vehicle?.kind === "vehicle" ? s.reminderAttachmentSelections : [],
+              }))
+            }
           />
           <KindCard
             active={state.rentalKind === "equipment"}
             title="Gerät"
             description="Gerätemiete mit Nutzerangaben, Gerätezustand, Zubehör/Vollständigkeit und Geräte-Mietbedingungen."
             disabled={Boolean(readOnly.vehicle)}
-            onClick={() => setState((s) => ({ ...s, rentalKind: "equipment", vehicle: s.vehicle?.kind === "equipment" ? s.vehicle : null }))}
+            onClick={() =>
+              setState((s) => ({
+                ...s,
+                rentalKind: "equipment",
+                vehicle: s.vehicle?.kind === "equipment" ? s.vehicle : null,
+                reminderAttachmentSelections: s.vehicle?.kind === "equipment" ? s.reminderAttachmentSelections : [],
+              }))
+            }
           />
         </div>
       </Section>
@@ -353,13 +377,14 @@ export default function RentalForm(props: {
               onChange={(e) => {
                 const vehicleId = e.target.value;
                 const v = primaryInventory.find((x) => x.id === vehicleId);
-                if (!v) return setState((s) => ({ ...s, vehicle: null }));
+                if (!v) return setState((s) => ({ ...s, vehicle: null, reminderAttachmentSelections: [] }));
                 const label =
                   (v.kind ?? "vehicle") === "equipment"
                     ? vehicleDisplayName(v)
                     : `${[v.brand, v.model].filter(Boolean).join(" ")} (${v.licensePlate})`.trim();
                 setState((s) => ({
                   ...s,
+                  reminderAttachmentSelections: s.reminderAttachmentSelections.filter((selection) => selection.itemId !== s.vehicle?.vehicleId),
                   vehicle: {
                     vehicleId: v.id,
                     kind: v.kind ?? "vehicle",
@@ -754,7 +779,15 @@ export default function RentalForm(props: {
                       <button
                         type="button"
                         className="shrink-0 rounded-xl px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-white"
-                        onClick={() => setState((s) => ({ ...s, addons: s.addons.filter((_, i) => i !== idx) }))}
+                        onClick={() =>
+                          setState((s) => ({
+                            ...s,
+                            addons: s.addons.filter((_, i) => i !== idx),
+                            reminderAttachmentSelections: a.equipmentId
+                              ? s.reminderAttachmentSelections.filter((selection) => selection.itemId !== a.equipmentId)
+                              : s.reminderAttachmentSelections,
+                          }))
+                        }
                       >
                         Entfernen
                       </button>
@@ -763,6 +796,54 @@ export default function RentalForm(props: {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </Section>
+
+      <Section
+        title="Erinnerungsmail Anhänge"
+        description="Spezifische Dokumente des Mietobjekts und ausgewählter Zubehör-Geräte werden der automatischen Erinnerung beigefügt."
+      >
+        {reminderDocumentsCount === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Für die aktuell ausgewählten Mietobjekte sind keine spezifischen Erinnerungsmail-Dokumente hinterlegt.
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {reminderItems.map((item) => {
+              const documents = item.reminderDocuments ?? [];
+              if (documents.length === 0) return null;
+              const selected = state.reminderAttachmentSelections.find((selection) => selection.itemId === item.id)?.documentIds ?? [];
+              return (
+                <div key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-sm font-semibold text-slate-900">{vehicleDisplayName(item)}</div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {documents.map((document) => (
+                      <label key={document.id} className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(document.id)}
+                          onChange={(e) =>
+                            setState((s) => {
+                              const current = s.reminderAttachmentSelections.find((selection) => selection.itemId === item.id)?.documentIds ?? [];
+                              const nextDocumentIds = e.target.checked ? [...new Set([...current, document.id])] : current.filter((id) => id !== document.id);
+                              const otherSelections = s.reminderAttachmentSelections.filter((selection) => selection.itemId !== item.id);
+                              return {
+                                ...s,
+                                reminderAttachmentSelections:
+                                  nextDocumentIds.length > 0 ? [...otherSelections, { itemId: item.id, documentIds: nextDocumentIds }] : otherSelections,
+                              };
+                            })
+                          }
+                        />
+                        <span className="min-w-0 flex-1 truncate">{document.filename}</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Spezifische Dokumente</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </Section>

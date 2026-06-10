@@ -3,9 +3,11 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import type { DamageInteriorLocation, DamagePosition, DamageSurface, DamageType, SketchMarker, VehicleStatus } from "../../domain/vehicle";
 import {
   addDamage,
+  addInventoryDocument,
   addMaintenance,
   addOdometerEntry,
   deleteMaintenance,
+  deleteInventoryDocument,
   deleteVehicle,
   getVehicle,
   updateMaintenance,
@@ -28,6 +30,16 @@ function Field(props: { label: string; children: React.ReactNode; hint?: string 
       {props.hint ? <span className="text-xs text-slate-500">{props.hint}</span> : null}
     </label>
   );
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
 }
 
 type DamageForm = {
@@ -321,6 +333,96 @@ export default function FahrzeugDetailsPage() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+          <h3 className="text-sm font-semibold tracking-tight">Erinnerungsmail Spezifische Dokumente</h3>
+          <p className="mt-1 text-xs text-slate-500">Diese Dokumente erscheinen bei Vermietungen in der Kategorie „Spezifische Dokumente“.</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-800">
+              Dokumente hochladen
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  for (const file of files) {
+                    addInventoryDocument(vehicleId, {
+                      filename: file.name,
+                      contentBase64: await fileToBase64(file),
+                      contentType: file.type || "application/octet-stream",
+                      category: "specific_documents",
+                    });
+                  }
+                  e.target.value = "";
+                  navigate(0);
+                }}
+              />
+            </label>
+          </div>
+          <div className="mt-4 grid gap-2">
+            {(data.vehicle.reminderDocuments ?? []).length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Keine spezifischen Erinnerungsmail-Dokumente hochgeladen.</div>
+            ) : (
+              (data.vehicle.reminderDocuments ?? []).map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-slate-900">{doc.filename}</div>
+                    <div className="text-xs text-slate-500">Spezifische Dokumente · {new Date(doc.uploadedAt).toLocaleString()}</div>
+                  </div>
+                  <button type="button" className="text-xs font-semibold text-rose-700" onClick={() => { deleteInventoryDocument(vehicleId, doc.id); navigate(0); }}>
+                    Löschen
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+          <h3 className="text-sm font-semibold tracking-tight">Allgemeine gerätspezifische Dokumente</h3>
+          <p className="mt-1 text-xs text-slate-500">Immer am Inventar verfügbar; wird nicht automatisch der Erinnerungsmail beigefügt.</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+              Dokumente hochladen
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  for (const file of files) {
+                    addInventoryDocument(vehicleId, {
+                      filename: file.name,
+                      contentBase64: await fileToBase64(file),
+                      contentType: file.type || "application/octet-stream",
+                      category: "general_equipment",
+                    });
+                  }
+                  e.target.value = "";
+                  navigate(0);
+                }}
+              />
+            </label>
+          </div>
+          <div className="mt-4 grid gap-2">
+            {(data.vehicle.generalDocuments ?? []).length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Keine allgemeinen Dokumente hochgeladen.</div>
+            ) : (
+              (data.vehicle.generalDocuments ?? []).map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-slate-900">{doc.filename}</div>
+                    <div className="text-xs text-slate-500">Allgemein · {new Date(doc.uploadedAt).toLocaleString()}</div>
+                  </div>
+                  <button type="button" className="text-xs font-semibold text-rose-700" onClick={() => { deleteInventoryDocument(vehicleId, doc.id); navigate(0); }}>
+                    Löschen
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="text-sm font-semibold tracking-tight">Kilometerstände</h3>
           <p className="mt-1 text-xs text-slate-500">

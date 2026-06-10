@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { navItems, type NavItem } from "../nav";
 import { listRequests } from "../api/portalApi";
+import { runDueRentalReminders } from "../pages/rentals/rentalReminderScheduler";
 
 const defaultBrand = "Transit on Tour!";
 
@@ -47,6 +48,14 @@ export default function AppLayout() {
       alive = false;
       window.clearInterval(t);
     };
+  }, []);
+
+  useEffect(() => {
+    void runDueRentalReminders();
+    const t = window.setInterval(() => {
+      void runDueRentalReminders();
+    }, 60_000);
+    return () => window.clearInterval(t);
   }, []);
 
   return (

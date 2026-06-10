@@ -35,6 +35,8 @@ function normalizeDb(db: VehicleDb): VehicleDb {
         typeof vehicle.dailyRentalPriceEur === "number" && Number.isFinite(vehicle.dailyRentalPriceEur)
           ? vehicle.dailyRentalPriceEur
           : undefined,
+      reminderDocuments: Array.isArray(vehicle.reminderDocuments) ? vehicle.reminderDocuments : [],
+      generalDocuments: Array.isArray(vehicle.generalDocuments) ? vehicle.generalDocuments : [],
     })),
   };
 }
