@@ -25,9 +25,25 @@ function isDb(value: unknown): value is ServiceDb {
   return db.version === 1 && Array.isArray(db.services);
 }
 
+function normalizeService(service: ServiceItem): ServiceItem {
+  return {
+    ...service,
+    appliesTo: service.appliesTo ?? "both",
+    suggestionRule: service.suggestionRule?.enabled
+      ? {
+          enabled: true,
+          minDays: service.suggestionRule.minDays,
+          maxDays: service.suggestionRule.maxDays,
+          quantityMode: service.suggestionRule.quantityMode ?? "rentalDays",
+          fixedQty: service.suggestionRule.fixedQty,
+        }
+      : service.suggestionRule,
+  };
+}
+
 function loadDb(): ServiceDb {
   const parsed = safeParse(localStorage.getItem(STORAGE_KEY));
-  if (isDb(parsed)) return { ...parsed, services: parsed.services.map((service) => ({ ...service, appliesTo: service.appliesTo ?? "both" })) };
+  if (isDb(parsed)) return { ...parsed, services: parsed.services.map(normalizeService) };
   return { version: 1, services: defaultServices };
 }
 
@@ -44,7 +60,7 @@ export function listServices(includeInactive = false): ServiceItem[] {
 
 export function upsertService(input: Omit<ServiceItem, "id"> & { id?: string }): ServiceItem {
   const db = loadDb();
-  const service: ServiceItem = { ...input, appliesTo: input.appliesTo ?? "both", id: input.id || createId("svc") };
+  const service: ServiceItem = normalizeService({ ...input, appliesTo: input.appliesTo ?? "both", id: input.id || createId("svc") });
   const idx = db.services.findIndex((item) => item.id === service.id);
   if (idx >= 0) db.services[idx] = service;
   else db.services.push(service);

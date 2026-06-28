@@ -1,3 +1,11 @@
+export type ServiceSuggestionRule = {
+  enabled: boolean;
+  minDays?: number;
+  maxDays?: number;
+  quantityMode: "rentalDays" | "fixed";
+  fixedQty?: number;
+};
+
 export type ServiceItem = {
   id: string;
   name: string;
@@ -6,6 +14,7 @@ export type ServiceItem = {
   vatRate: number;
   active: boolean;
   appliesTo?: "vehicle" | "equipment" | "both";
+  suggestionRule?: ServiceSuggestionRule;
 };
 
 export type ServiceDb = {
