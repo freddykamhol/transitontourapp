@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { config } from "./config.js";
+import { apiHealthOk } from "./healthCheck.js";
 import { migrate } from "./db.js";
 import { corsMiddleware } from "./cors.js";
 import { requireApiKey } from "./auth.js";
@@ -511,7 +512,11 @@ const server = app.listen(config.port, () => {
   console.log(`[portal-api] listening on http://localhost:${config.port}`);
 });
 
-server.on("error", (err) => {
+server.on("error", async (err) => {
+  if (err?.code === "EADDRINUSE" && (await apiHealthOk(config.port))) {
+    console.log(`[portal-api] läuft bereits auf http://localhost:${config.port}`);
+    process.exit(0);
+  }
   console.error("[portal-api] failed to start", err);
   process.exit(1);
 });

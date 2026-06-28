@@ -1,9 +1,16 @@
 import type { Rental, RentalAddon, RentalInsurance, RentalParty, RentalPayment, RentalReminderAttachmentSelection, RentalVehicleRef } from "../domain/rental";
-import { createId } from "../lib/id";
 import { nowIso } from "../lib/time";
 import { loadRentalDb, saveRentalDb } from "./rentalDb";
 
 export type RentalStatus = "geplant" | "laufend" | "archiv";
+
+function nextRentalId(existingRentals: Rental[]): string {
+  const highest = existingRentals.reduce((max, rental) => {
+    const match = rental.id.match(/^MV(\d{9})$/);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  return `MV${String(highest + 1).padStart(9, "0")}`;
+}
 
 export function getRentalStatus(rental: Rental, now = new Date()): { status: RentalStatus; overdue: boolean } {
   if (rental.actualReturnAt) return { status: "archiv", overdue: false };
@@ -42,7 +49,7 @@ export function createRental(input: CreateRentalInput): Rental {
   const now = nowIso();
 
   const rental: Rental = {
-    id: createId("rent"),
+    id: nextRentalId(db.rentals),
     createdAt: now,
     updatedAt: now,
     startAt: input.startAt,

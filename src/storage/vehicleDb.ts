@@ -24,12 +24,33 @@ function isDbV2(value: unknown): value is VehicleDb {
   );
 }
 
+function internalNumberPrefix(kind: unknown, category: unknown): string {
+  if (kind === "equipment") return "GE";
+  const firstLetter = String(category ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .match(/[A-Za-z]/)?.[0];
+  return (firstLetter ?? "F").toUpperCase();
+}
+
 function normalizeDb(db: VehicleDb): VehicleDb {
+  const usedInternalNumbers = new Set(db.vehicles.map((vehicle) => vehicle.internalNumber).filter((value): value is string => Boolean(value)));
+  const nextInternalNumber = (kind: unknown, category: unknown) => {
+    const prefix = internalNumberPrefix(kind, category);
+    let nextNumber = 1;
+    while (usedInternalNumbers.has(`${prefix}${String(nextNumber).padStart(4, "0")}`)) nextNumber += 1;
+    const internalNumber = `${prefix}${String(nextNumber).padStart(4, "0")}`;
+    usedInternalNumbers.add(internalNumber);
+    return internalNumber;
+  };
+
   return {
     ...db,
     vehicles: db.vehicles.map((vehicle) => ({
       ...vehicle,
       kind: vehicle.kind ?? "vehicle",
+      internalNumber: vehicle.internalNumber?.trim() || nextInternalNumber(vehicle.kind ?? "vehicle", vehicle.category),
       accessoryForVehicleRental: Boolean(vehicle.accessoryForVehicleRental),
       dailyRentalPriceEur:
         typeof vehicle.dailyRentalPriceEur === "number" && Number.isFinite(vehicle.dailyRentalPriceEur)

@@ -8,6 +8,14 @@ import { latestRelease } from "../releaseNotes";
 const defaultBrand = "Transit on Tour!";
 const changelogSeenKey = `tot.changelog.seen.${latestRelease.id}`;
 
+function shouldShowChangelog(): boolean {
+  try {
+    return localStorage.getItem(changelogSeenKey) !== "1";
+  } catch {
+    return true;
+  }
+}
+
 function getBrandText(): string {
   const brand = (import.meta.env.VITE_PORTAL_BRAND as string | undefined)?.trim();
   return brand && brand.length > 0 ? brand : defaultBrand;
@@ -25,7 +33,7 @@ export default function AppLayout() {
   const pageTitle = getPageTitle(location.pathname, navItems);
   const brandText = getBrandText();
   const [newRequestCount, setNewRequestCount] = useState<number | null>(null);
-  const [showChangelog, setShowChangelog] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(shouldShowChangelog);
 
   const navBadges = useMemo(() => {
     return {
@@ -59,14 +67,6 @@ export default function AppLayout() {
       void runDueRentalReminders();
     }, 60_000);
     return () => window.clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    try {
-      setShowChangelog(localStorage.getItem(changelogSeenKey) !== "1");
-    } catch {
-      setShowChangelog(true);
-    }
   }, []);
 
   function closeChangelog(): void {

@@ -4,9 +4,12 @@ export function inventoryKindLabel(kind: InventoryKind): string {
   return kind === "equipment" ? "Gerät" : "Fahrzeug";
 }
 
-export function vehicleDisplayName(vehicle: Pick<Vehicle, "kind" | "licensePlate" | "brand" | "model" | "category">): string {
+export function vehicleDisplayName(vehicle: Pick<Vehicle, "kind" | "licensePlate" | "brand" | "model" | "category" | "internalNumber">): string {
   const kind = vehicle.kind ?? "vehicle";
-  if (kind === "equipment") return [vehicle.brand, vehicle.model].filter(Boolean).join(" ") || vehicle.category || vehicle.licensePlate || "Gerät";
+  if (kind === "equipment") {
+    const name = [vehicle.brand, vehicle.model].filter(Boolean).join(" ") || vehicle.category || vehicle.licensePlate || "Gerät";
+    return vehicle.internalNumber ? `${vehicle.internalNumber} · ${name}` : name;
+  }
   return vehicle.licensePlate || [vehicle.brand, vehicle.model].filter(Boolean).join(" ") || "Fahrzeug";
 }
 

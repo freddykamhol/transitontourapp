@@ -6,16 +6,15 @@ export type ReleaseNote = {
 };
 
 export const latestRelease: ReleaseNote = {
-  id: "2026-06-10-reminder-mail-name-fields",
-  title: "Erinnerungsmails & Mietvertragsdaten",
-  date: "10.06.2026",
+  id: "2026-06-28-tarife-geraete-nummern",
+  title: "Tarife, Gerätepreise & Nummern",
+  date: "28.06.2026",
   highlights: [
-    "Neue Einstellungen-Seite für Erinnerungsmails mit Betreff, Text, Versandzeit und Anhang-Kategorien.",
-    "Automatischer Erinnerungsmail-Versand vor Rückgabe inklusive Mietvertrag, Rückgabecheckliste und auswählbaren spezifischen Dokumenten.",
-    "Dokument-Uploads an Fahrzeugen/Geräten für Erinnerungsmail-spezifische und allgemeine gerätespezifische Dokumente.",
-    "Mietanlage: spezifische Dokumente je Mietobjekt und Zubehör auswählbar.",
-    "Mietvertrag-Anlage: Mietername in Anrede, Titel, Vorname(n) und Nachname getrennt; Zusatzfahrer ebenfalls angepasst.",
-    "Namensfelder im Formular zweispaltig angeordnet.",
+    "Leistungen können jetzt als Tarife mit Vorschlagsregeln angelegt werden und greifen automatisch bei passenden Fahrzeugmieten.",
+    "Geräte haben eigene Tagesmietpreise statt Katalogtarife; der Gerätepreis wird im Vermietungsformular automatisch pro Miettag berechnet.",
+    "Interne Nummern werden automatisch vergeben: Fahrzeuge nach Kategorie-Präfix, Geräte mit GE-Präfix.",
+    "Vertragsnummern sind einfacher lesbar und starten jetzt mit MV plus 9-stelliger Nummer.",
+    "Das Changelog erscheint wieder einmalig pro Gerät/Browser je Release.",
+    "Der Portalstart erkennt eine bereits laufende API auf dem Standardport und bricht dann nicht mehr fehlerhaft ab.",
   ],
 };
-

@@ -13,6 +13,26 @@ function getCurrentKm(db: VehicleDb, vehicleId: string): number | undefined {
   return entries.at(-1)?.km;
 }
 
+function internalNumberPrefix(input: Pick<Vehicle, "kind" | "category">): string {
+  if ((input.kind ?? "vehicle") === "equipment") return "GE";
+  const firstLetter = (input.category ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .match(/[A-Za-z]/)?.[0];
+  return (firstLetter ?? "F").toUpperCase();
+}
+
+function nextInternalNumber(db: VehicleDb, input: Pick<Vehicle, "kind" | "category">): string {
+  const prefix = internalNumberPrefix(input);
+  const pattern = new RegExp(`^${prefix}(\\d{4})$`);
+  const highest = db.vehicles.reduce((max, vehicle) => {
+    const match = (vehicle.internalNumber ?? "").match(pattern);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  return `${prefix}${String(highest + 1).padStart(4, "0")}`;
+}
+
 export function listVehicles(): VehicleSummary[] {
   const db = loadVehicleDb();
   return db.vehicles
@@ -51,7 +71,8 @@ export function getVehicle(vehicleId: string): {
 export function createVehicle(input: Omit<Vehicle, "id" | "createdAt" | "updatedAt">): Vehicle {
   const db = loadVehicleDb();
   const now = nowIso();
-  const vehicle: Vehicle = { ...input, id: createId("veh"), createdAt: now, updatedAt: now };
+  const internalNumber = input.internalNumber?.trim() || nextInternalNumber(db, input);
+  const vehicle: Vehicle = { ...input, internalNumber, id: createId("veh"), createdAt: now, updatedAt: now };
   db.vehicles.push(vehicle);
   saveVehicleDb(db);
   return vehicle;

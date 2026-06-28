@@ -37,7 +37,7 @@ export default function FahrzeugeIndexPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold tracking-tight">Inventar</h2>
-            <p className="mt-1 text-xs text-slate-500">Fahrzeuge und Geräte verwalten, Schäden dokumentieren und Zubehör für Fahrzeugmieten konfigurieren.</p>
+            <p className="mt-1 text-xs text-slate-500">Fahrzeuge und Geräte verwalten, Schäden dokumentieren und Tagesmietpreise für Geräte pflegen.</p>
           </div>
           <Link
             to="/fahrzeug/neu"
@@ -73,7 +73,7 @@ export default function FahrzeugeIndexPage() {
                 <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
                   {kind === "vehicle" ? <span>KM: {typeof item.currentKm === "number" ? `${item.currentKm}` : "—"}</span> : null}
                   <span>Schäden: {item.openDamages}</span>
-                  {kind === "equipment" ? <span>Zubehör: {item.accessoryForVehicleRental ? `${(item.dailyRentalPriceEur ?? 0).toFixed(2)} €/Tag` : "Nein"}</span> : null}
+                  {kind === "equipment" ? <span>Tagesmiete: {typeof item.dailyRentalPriceEur === "number" ? `${item.dailyRentalPriceEur.toFixed(2)} €/Tag` : "—"}</span> : null}
                 </div>
               </Link>
             ))
@@ -87,7 +87,7 @@ export default function FahrzeugeIndexPage() {
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Kategorie</th>
                 <th className="px-4 py-3">Status</th>
-                {kind === "vehicle" ? <th className="px-4 py-3">KM</th> : <th className="px-4 py-3">Zubehör Fahrzeugmiete</th>}
+                {kind === "vehicle" ? <th className="px-4 py-3">KM</th> : <th className="px-4 py-3">Tagesmietpreis</th>}
                 <th className="px-4 py-3">Schäden</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -107,7 +107,7 @@ export default function FahrzeugeIndexPage() {
                     <td className="px-4 py-3 text-slate-700">
                       {kind === "vehicle"
                         ? typeof item.currentKm === "number" ? `${item.currentKm} km` : "—"
-                        : item.accessoryForVehicleRental ? `${(item.dailyRentalPriceEur ?? 0).toFixed(2)} €/Tag` : "Nein"}
+                        : typeof item.dailyRentalPriceEur === "number" ? `${item.dailyRentalPriceEur.toFixed(2)} €/Tag` : "—"}
                     </td>
                     <td className="px-4 py-3 text-slate-700">{item.openDamages}</td>
                     <td className="px-4 py-3 text-right"><Link to={`/fahrzeug/${item.id}`} className="text-xs font-semibold text-slate-900 hover:text-slate-700">Öffnen</Link></td>

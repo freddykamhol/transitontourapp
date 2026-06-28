@@ -157,9 +157,9 @@ export default function FahrzeugDetailsPage() {
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <Pill text={inventoryKindLabel(kind)} className="bg-slate-100 text-slate-700 ring-1 ring-slate-200" />
               <Pill text={formatStatus(data.vehicle.status)} className={statusPillClass(data.vehicle.status)} />
-              <span className="text-xs text-slate-500">{data.vehicle.id}</span>
+              <span className="text-xs text-slate-500">Interne Nr. {data.vehicle.internalNumber ?? "—"}</span>
               {!isEquipment && typeof currentKm === "number" ? <span className="text-xs text-slate-500">{currentKm} km</span> : null}
-              {isEquipment && data.vehicle.accessoryForVehicleRental ? (
+              {isEquipment && typeof data.vehicle.dailyRentalPriceEur === "number" ? (
                 <span className="text-xs text-slate-500">{(data.vehicle.dailyRentalPriceEur ?? 0).toFixed(2)} €/Tag</span>
               ) : null}
             </div>
@@ -209,16 +209,10 @@ export default function FahrzeugDetailsPage() {
               />
             </Field>
           ) : null}
-          <Field label="Interne Nummer" hint="Optional">
-            <input
-              value={edit.internalNumber}
-              onChange={(e) => {
-                const next = e.target.value;
-                setEdit((s) => (s ? { ...s, internalNumber: next } : s));
-                updateVehicle(vehicleId, { internalNumber: next.trim() || undefined });
-              }}
-              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
-            />
+          <Field label="Interne Nummer" hint="Automatisch vergeben">
+            <div className="flex h-11 items-center rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-900 shadow-sm">
+              {edit.internalNumber || data.vehicle.internalNumber || "—"}
+            </div>
           </Field>
           <Field label={isEquipment ? "Geräteart / Kategorie" : "Fahrzeugart / Kategorie"} hint="Optional">
             <input
@@ -285,34 +279,18 @@ export default function FahrzeugDetailsPage() {
           <div className="md:col-span-2">
             {isEquipment ? (
               <div className="mb-4 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={edit.accessoryForVehicleRental}
-                    onChange={(e) => {
-                      const next = e.target.checked;
-                      setEdit((s) => (s ? { ...s, accessoryForVehicleRental: next } : s));
-                      updateVehicle(vehicleId, {
-                        accessoryForVehicleRental: next,
-                        dailyRentalPriceEur: next ? Number(edit.dailyRentalPriceEur.replace(",", ".")) || undefined : undefined,
-                      });
-                    }}
-                  />
-                  Zubehör Fahrzeugmiete
-                </label>
-                <Field label="Tagesmietpreis (EUR)" hint="Pflicht für buchbares Zubehör.">
+                <Field label="Tagesmietpreis (EUR)" hint="Wird bei Gerätemieten automatisch pro Miettag genutzt.">
                   <input
                     type="number"
                     min={0}
                     step={0.01}
-                    disabled={!edit.accessoryForVehicleRental}
                     value={edit.dailyRentalPriceEur}
                     onChange={(e) => {
                       const next = e.target.value;
                       setEdit((s) => (s ? { ...s, dailyRentalPriceEur: next } : s));
-                      updateVehicle(vehicleId, { dailyRentalPriceEur: Number(next.replace(",", ".")) || undefined });
+                      updateVehicle(vehicleId, { accessoryForVehicleRental: true, dailyRentalPriceEur: Number(next.replace(",", ".")) || undefined });
                     }}
-                    className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400 disabled:bg-slate-100"
+                    className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400"
                   />
                 </Field>
               </div>

@@ -65,8 +65,8 @@ export default function FahrzeugNeuPage() {
   const dailyPrice = Number(form.dailyRentalPriceEur.replace(",", "."));
   const canSubmit = useMemo(() => {
     if (form.kind === "vehicle" && form.licensePlate.trim().length === 0) return false;
-    if (form.kind === "equipment" && ![form.brand, form.model, form.category, form.internalNumber].some((value) => value.trim().length > 0)) return false;
-    if (form.kind === "equipment" && form.accessoryForVehicleRental && (!Number.isFinite(dailyPrice) || dailyPrice <= 0)) return false;
+    if (form.kind === "equipment" && ![form.brand, form.model, form.category].some((value) => value.trim().length > 0)) return false;
+    if (form.kind === "equipment" && (!Number.isFinite(dailyPrice) || dailyPrice <= 0)) return false;
     return true;
   }, [dailyPrice, form]);
 
@@ -100,15 +100,15 @@ export default function FahrzeugNeuPage() {
             if (!canSubmit) return;
             const created = createVehicle({
               kind: form.kind,
-              licensePlate: form.kind === "vehicle" ? form.licensePlate.trim().toUpperCase() : form.internalNumber.trim() || form.model.trim() || form.category.trim() || "GERÄT",
-              internalNumber: form.internalNumber.trim() || undefined,
+              licensePlate: form.kind === "vehicle" ? form.licensePlate.trim().toUpperCase() : form.model.trim() || form.category.trim() || "GERÄT",
+              internalNumber: undefined,
               category: form.category.trim() || undefined,
               brand: form.brand.trim() || undefined,
               model: form.model.trim() || undefined,
               vin: form.kind === "vehicle" ? form.vin.trim() || undefined : undefined,
               registrationDocumentNumber: form.kind === "vehicle" ? form.registrationDocumentNumber.trim() || undefined : undefined,
-              accessoryForVehicleRental: form.kind === "equipment" ? form.accessoryForVehicleRental : false,
-              dailyRentalPriceEur: form.kind === "equipment" && form.accessoryForVehicleRental ? dailyPrice : undefined,
+              accessoryForVehicleRental: form.kind === "equipment" ? true : false,
+              dailyRentalPriceEur: form.kind === "equipment" ? dailyPrice : undefined,
               status: form.status,
               notes: form.notes.trim() || undefined,
             });
@@ -126,7 +126,7 @@ export default function FahrzeugNeuPage() {
               <KindCard
                 active={form.kind === "equipment"}
                 title="Gerät"
-                description="Geräte, Maschinen oder Zubehör. Optional als buchbares Zubehör für Fahrzeugmieten."
+                description="Geräte, Maschinen oder Zubehör mit eigenem Tagesmietpreis."
                 onClick={() => setForm((s) => ({ ...s, kind: "equipment", licensePlate: "" }))}
               />
             </div>
@@ -142,9 +142,10 @@ export default function FahrzeugNeuPage() {
                     <input value={form.licensePlate} onChange={(e) => setForm((s) => ({ ...s, licensePlate: e.target.value }))} className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400" placeholder="B-AB 1234" autoFocus />
                   </Field>
                 ) : null}
-                <Field label="Interne Nummer" hint={form.kind === "equipment" ? "Empfohlen für Geräte" : "Optional"}>
-                  <input value={form.internalNumber} onChange={(e) => setForm((s) => ({ ...s, internalNumber: e.target.value }))} className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400" placeholder={form.kind === "equipment" ? "G-001" : "T-001"} />
-                </Field>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <div className="text-xs font-semibold text-slate-500">Interne Nummer</div>
+                  <div className="mt-1 font-semibold text-slate-900">Wird beim Speichern automatisch vergeben.</div>
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
@@ -170,12 +171,8 @@ export default function FahrzeugNeuPage() {
                 </div>
               ) : (
                 <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
-                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    <input type="checkbox" checked={form.accessoryForVehicleRental} onChange={(e) => setForm((s) => ({ ...s, accessoryForVehicleRental: e.target.checked }))} />
-                    Zubehör Fahrzeugmiete
-                  </label>
-                  <Field label="Tagesmietpreis (EUR)" hint="Pflicht, wenn das Gerät als Zubehör buchbar sein soll.">
-                    <input type="number" min={0} step={0.01} disabled={!form.accessoryForVehicleRental} value={form.dailyRentalPriceEur} onChange={(e) => setForm((s) => ({ ...s, dailyRentalPriceEur: e.target.value }))} className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400 disabled:bg-slate-100" placeholder="25,00" />
+                  <Field label="Tagesmietpreis (EUR)" hint="Pflicht für Gerätemieten. Der Preis wird im Vermietungsformular automatisch pro Miettag genutzt.">
+                    <input type="number" min={0} step={0.01} value={form.dailyRentalPriceEur} onChange={(e) => setForm((s) => ({ ...s, dailyRentalPriceEur: e.target.value }))} className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-slate-400" placeholder="25,00" />
                   </Field>
                 </div>
               )}

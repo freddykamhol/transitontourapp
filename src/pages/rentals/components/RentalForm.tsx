@@ -107,6 +107,8 @@ function tariffAddonId(service: ServiceItem): string {
   return `tariff-${service.id}`;
 }
 
+const equipmentRentalAddonId = "equipment-rental-daily-price";
+
 function tariffAddonFromService(service: ServiceItem, durationDays: number): RentalAddon {
   const rule = service.suggestionRule;
   return {
@@ -131,6 +133,7 @@ function areSameAddons(a: RentalAddon[], b: RentalAddon[]): boolean {
     return (
       addon.id === other.id &&
       addon.serviceId === other.serviceId &&
+      addon.equipmentId === other.equipmentId &&
       addon.name === other.name &&
       addon.hint === other.hint &&
       addon.qty === other.qty &&
@@ -140,14 +143,32 @@ function areSameAddons(a: RentalAddon[], b: RentalAddon[]): boolean {
   });
 }
 
-function syncSuggestedTariffAddons(state: RentalFormState, services: ServiceItem[]): RentalFormState {
+function equipmentRentalAddonFromState(state: RentalFormState, inventory: Array<{ id: string; dailyRentalPriceEur?: number }>, durationDays: number): RentalAddon | null {
+  if (state.rentalKind !== "equipment" || !state.vehicle) return null;
+  const selectedEquipment = inventory.find((item) => item.id === state.vehicle?.vehicleId);
+  const dailyPrice = selectedEquipment?.dailyRentalPriceEur;
+  if (typeof dailyPrice !== "number" || !Number.isFinite(dailyPrice) || dailyPrice <= 0) return null;
+  return {
+    id: equipmentRentalAddonId,
+    name: `Miete ${state.vehicle.label}`,
+    hint: "Tagesmietpreis Gerät",
+    qty: durationDays,
+    unitPriceEur: dailyPrice,
+    vatRate: 19,
+  };
+}
+
+function syncAutomaticAddons(state: RentalFormState, services: ServiceItem[], inventory: Array<{ id: string; dailyRentalPriceEur?: number }>): RentalFormState {
   const durationDays = rentalDays(state.startAt, state.endAt);
-  const applicableServices = services.filter((service) => (service.appliesTo ?? "both") === "both" || service.appliesTo === state.rentalKind);
-  const tariffAddons = applicableServices
-    .filter((service) => serviceMatchesSuggestion(service, durationDays))
-    .map((service) => tariffAddonFromService(service, durationDays));
-  const manualAddons = state.addons.filter((addon) => !addon.id.startsWith("tariff-"));
-  const addons = [...manualAddons, ...tariffAddons];
+  const manualAddons = state.addons.filter((addon) => !addon.id.startsWith("tariff-") && addon.id !== equipmentRentalAddonId);
+  const automaticAddons =
+    state.rentalKind === "equipment"
+      ? [equipmentRentalAddonFromState(state, inventory, durationDays)].filter((addon): addon is RentalAddon => Boolean(addon))
+      : services
+          .filter((service) => (service.appliesTo ?? "both") === "both" || service.appliesTo === "vehicle")
+          .filter((service) => serviceMatchesSuggestion(service, durationDays))
+          .map((service) => tariffAddonFromService(service, durationDays));
+  const addons = [...manualAddons, ...automaticAddons];
   return areSameAddons(state.addons, addons) ? state : { ...state, addons };
 }
 
@@ -190,7 +211,7 @@ export default function RentalForm(props: {
   const [state, setState] = useState<RentalFormState>(() => {
     const initial = props.initial;
     if (initial) {
-      return syncSuggestedTariffAddons({
+      return syncAutomaticAddons({
         rentalKind: initial.vehicle?.kind ?? "vehicle",
         startAt: initial.startAt,
         endAt: initial.endAt,
@@ -202,7 +223,7 @@ export default function RentalForm(props: {
         payment: initial.payment ?? defaultPayment(),
         reminderAttachmentSelections: initial.reminderWorkflow?.attachmentSelections ?? [],
         internalNotes: initial.internalNotes ?? "",
-      }, services);
+      }, services, inventory);
     }
 
     const start = new Date();
@@ -210,7 +231,7 @@ export default function RentalForm(props: {
     const end = new Date(start);
     end.setDate(end.getDate() + 3);
 
-    return syncSuggestedTariffAddons({
+    return syncAutomaticAddons({
       startAt: start.toISOString(),
       endAt: end.toISOString(),
       rentalKind: "vehicle",
@@ -222,11 +243,16 @@ export default function RentalForm(props: {
       payment: defaultPayment(),
       reminderAttachmentSelections: [],
       internalNotes: "",
-    }, services);
+    }, services, inventory);
   });
 
   const canSubmit = useMemo(() => {
     if (!state.vehicle) return false;
+    if (state.rentalKind === "equipment") {
+      const selectedEquipment = inventory.find((item) => item.id === state.vehicle?.vehicleId);
+      const dailyPrice = selectedEquipment?.dailyRentalPriceEur;
+      if (typeof dailyPrice !== "number" || !Number.isFinite(dailyPrice) || dailyPrice <= 0) return false;
+    }
     const hasStructuredTenantName = Boolean((state.tenant.firstNames ?? "").trim() && (state.tenant.lastName ?? "").trim());
     const hasLegacyTenantName = Boolean(!(state.tenant.firstNames ?? "").trim() && !(state.tenant.lastName ?? "").trim() && !(state.tenant.salutation ?? "").trim() && !(state.tenant.title ?? "").trim() && state.tenant.name.trim());
     if (!hasStructuredTenantName && !hasLegacyTenantName) return false;
@@ -234,15 +260,15 @@ export default function RentalForm(props: {
     if (!state.startAt || !state.endAt) return false;
     if (new Date(state.endAt).getTime() <= new Date(state.startAt).getTime()) return false;
     return true;
-  }, [state]);
+  }, [inventory, state]);
 
   const selectedVehicleId = state.vehicle?.vehicleId ?? "";
   const primaryInventory = state.rentalKind === "equipment" ? equipment : vehicles;
   const readOnly = props.readOnlyKeys ?? {};
-  const applicableServices = services.filter((service) => (service.appliesTo ?? "both") === "both" || service.appliesTo === state.rentalKind);
+  const applicableServices = state.rentalKind === "equipment" ? [] : services.filter((service) => (service.appliesTo ?? "both") === "both" || service.appliesTo === "vehicle");
   const addonTotal = state.addons.reduce((sum, item) => sum + (item.unitPriceEur ?? 0) * item.qty, 0);
   const durationDays = rentalDays(state.startAt, state.endAt);
-  const suggestedTariffs = applicableServices.filter((service) => serviceMatchesSuggestion(service, durationDays));
+  const suggestedTariffs = state.rentalKind === "equipment" ? [] : applicableServices.filter((service) => serviceMatchesSuggestion(service, durationDays));
   const reminderItems = [
     ...(state.vehicle?.vehicleId ? [state.vehicle.vehicleId] : []),
     ...state.addons.map((addon) => addon.equipmentId).filter((id): id is string => Boolean(id)),
@@ -277,7 +303,7 @@ export default function RentalForm(props: {
             disabled={Boolean(readOnly.vehicle)}
             onClick={() =>
               setState((s) =>
-                syncSuggestedTariffAddons(
+                syncAutomaticAddons(
                   {
                     ...s,
                     rentalKind: "vehicle",
@@ -285,6 +311,7 @@ export default function RentalForm(props: {
                     reminderAttachmentSelections: s.vehicle?.kind === "vehicle" ? s.reminderAttachmentSelections : [],
                   },
                   services,
+                  inventory,
                 ),
               )
             }
@@ -296,7 +323,7 @@ export default function RentalForm(props: {
             disabled={Boolean(readOnly.vehicle)}
             onClick={() =>
               setState((s) =>
-                syncSuggestedTariffAddons(
+                syncAutomaticAddons(
                   {
                     ...s,
                     rentalKind: "equipment",
@@ -304,6 +331,7 @@ export default function RentalForm(props: {
                     reminderAttachmentSelections: s.vehicle?.kind === "equipment" ? s.reminderAttachmentSelections : [],
                   },
                   services,
+                  inventory,
                 ),
               )
             }
@@ -318,7 +346,7 @@ export default function RentalForm(props: {
               type="datetime-local"
               value={toLocalDateTime(state.startAt)}
               disabled={Boolean(readOnly.startAt)}
-              onChange={(e) => setState((s) => syncSuggestedTariffAddons({ ...s, startAt: fromLocalDateTime(e.target.value) }, services))}
+              onChange={(e) => setState((s) => syncAutomaticAddons({ ...s, startAt: fromLocalDateTime(e.target.value) }, services, inventory))}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
               required
             />
@@ -328,7 +356,7 @@ export default function RentalForm(props: {
               type="datetime-local"
               value={toLocalDateTime(state.endAt)}
               disabled={Boolean(readOnly.endAt)}
-              onChange={(e) => setState((s) => syncSuggestedTariffAddons({ ...s, endAt: fromLocalDateTime(e.target.value) }, services))}
+              onChange={(e) => setState((s) => syncAutomaticAddons({ ...s, endAt: fromLocalDateTime(e.target.value) }, services, inventory))}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
               required
             />
@@ -487,25 +515,31 @@ export default function RentalForm(props: {
               onChange={(e) => {
                 const vehicleId = e.target.value;
                 const v = primaryInventory.find((x) => x.id === vehicleId);
-                if (!v) return setState((s) => ({ ...s, vehicle: null, reminderAttachmentSelections: [] }));
+                if (!v) return setState((s) => syncAutomaticAddons({ ...s, vehicle: null, reminderAttachmentSelections: [] }, services, inventory));
                 const label =
                   (v.kind ?? "vehicle") === "equipment"
                     ? vehicleDisplayName(v)
                     : `${[v.brand, v.model].filter(Boolean).join(" ")} (${v.licensePlate})`.trim();
-                setState((s) => ({
-                  ...s,
-                  reminderAttachmentSelections: s.reminderAttachmentSelections.filter((selection) => selection.itemId !== s.vehicle?.vehicleId),
-                  vehicle: {
-                    vehicleId: v.id,
-                    kind: v.kind ?? "vehicle",
-                    label,
-                    category: v.category,
-                    type: [v.brand, v.model].filter(Boolean).join(" "),
-                    licensePlate: (v.kind ?? "vehicle") === "vehicle" ? v.licensePlate : undefined,
-                    vin: (v.kind ?? "vehicle") === "vehicle" ? v.vin : undefined,
-                    registrationDocumentNumber: (v.kind ?? "vehicle") === "vehicle" ? v.registrationDocumentNumber : undefined,
-                  },
-                }));
+                setState((s) =>
+                  syncAutomaticAddons(
+                    {
+                      ...s,
+                      reminderAttachmentSelections: s.reminderAttachmentSelections.filter((selection) => selection.itemId !== s.vehicle?.vehicleId),
+                      vehicle: {
+                        vehicleId: v.id,
+                        kind: v.kind ?? "vehicle",
+                        label,
+                        category: v.category,
+                        type: [v.brand, v.model].filter(Boolean).join(" "),
+                        licensePlate: (v.kind ?? "vehicle") === "vehicle" ? v.licensePlate : undefined,
+                        vin: (v.kind ?? "vehicle") === "vehicle" ? v.vin : undefined,
+                        registrationDocumentNumber: (v.kind ?? "vehicle") === "vehicle" ? v.registrationDocumentNumber : undefined,
+                      },
+                    },
+                    services,
+                    inventory,
+                  ),
+                );
               }}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300"
               required
@@ -753,8 +787,12 @@ export default function RentalForm(props: {
       </Section>
 
       <Section
-        title="Zusatzleistungen"
-        description="Aus dem Leistungskatalog auswählen und Menge anpassen. Passende Tarife werden automatisch anhand der Mietdauer ergänzt."
+        title={state.rentalKind === "equipment" ? "Mietpreis" : "Zusatzleistungen"}
+        description={
+          state.rentalKind === "equipment"
+            ? "Der Tagesmietpreis kommt direkt aus dem ausgewählten Gerät und wird pro Miettag berechnet."
+            : "Aus dem Leistungskatalog auswählen und Menge anpassen. Passende Tarife werden automatisch anhand der Mietdauer ergänzt."
+        }
         right={
           <div className="flex flex-wrap justify-end gap-2">
             <button
@@ -810,7 +848,7 @@ export default function RentalForm(props: {
             <div className="flex items-end text-sm font-semibold text-slate-900">Summe: {addonTotal.toFixed(2)} €</div>
           </div>
         ) : null}
-        {rentableEquipment.length > 0 ? (
+        {state.rentalKind === "vehicle" && rentableEquipment.length > 0 ? (
           <div className="mb-4 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_auto]">
             <Field label="Gerät als Zubehör">
               <select
@@ -850,7 +888,9 @@ export default function RentalForm(props: {
           </div>
         ) : null}
         {state.addons.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Keine Zusatzleistungen.</div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+            {state.rentalKind === "equipment" ? "Für dieses Gerät ist noch kein Tagesmietpreis hinterlegt." : "Keine Zusatzleistungen."}
+          </div>
         ) : (
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="hidden border-b border-slate-200 bg-slate-50 px-4 py-3 xl:grid xl:grid-cols-[minmax(190px,1.25fr)_minmax(220px,1.45fr)_90px_100px_120px_minmax(120px,0.75fr)_100px] xl:gap-3">
@@ -875,6 +915,10 @@ export default function RentalForm(props: {
                       <span className="mb-2 inline-flex w-fit items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
                         <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                         Vorschlag
+                      </span>
+                    ) : a.id === equipmentRentalAddonId ? (
+                      <span className="mb-2 inline-flex w-fit rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                        Gerätepreis
                       </span>
                     ) : null}
                     <input
@@ -953,21 +997,27 @@ export default function RentalForm(props: {
                   </div>
                   <div className="grid gap-1">
                     <span className="text-xs font-semibold text-slate-600 xl:sr-only">Aktion</span>
-                    <button
-                      type="button"
-                      className="flex h-11 items-center justify-center rounded-2xl border border-rose-100 bg-white px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                      onClick={() =>
-                        setState((s) => ({
-                          ...s,
-                          addons: s.addons.filter((_, i) => i !== idx),
-                          reminderAttachmentSelections: a.equipmentId
-                            ? s.reminderAttachmentSelections.filter((selection) => selection.itemId !== a.equipmentId)
-                            : s.reminderAttachmentSelections,
-                        }))
-                      }
-                    >
-                      Entfernen
-                    </button>
+                    {a.id === equipmentRentalAddonId ? (
+                      <div className="flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-500">
+                        Automatisch
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex h-11 items-center justify-center rounded-2xl border border-rose-100 bg-white px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                        onClick={() =>
+                          setState((s) => ({
+                            ...s,
+                            addons: s.addons.filter((_, i) => i !== idx),
+                            reminderAttachmentSelections: a.equipmentId
+                              ? s.reminderAttachmentSelections.filter((selection) => selection.itemId !== a.equipmentId)
+                              : s.reminderAttachmentSelections,
+                          }))
+                        }
+                      >
+                        Entfernen
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

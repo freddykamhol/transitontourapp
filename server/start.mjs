@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { config } from "./config.js";
+import { apiHealthOk } from "./healthCheck.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(here, "..", "dist");
@@ -24,4 +26,9 @@ if (missingAssets.length > 0) {
 }
 
 console.log(`[portal-start] Frontend OK: ${distIndex}`);
-await import("./index.js");
+
+if (await apiHealthOk(config.port)) {
+  console.log(`[portal-start] API läuft bereits auf http://localhost:${config.port}`);
+} else {
+  await import("./index.js");
+}
